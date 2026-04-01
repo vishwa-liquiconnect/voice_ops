@@ -1,0 +1,265 @@
+{
+	"doctype": "DocType",
+	"name": "Checklist Run",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"autoname": "format:CRUN-{####}",
+	"description": "An instance of executing a checklist against a driver/trip via voice call",
+	"show_name_in_global_search": 1,
+	"search_fields": "checklist_template,crew_member_name,status",
+	"field_order": [
+		"context_section",
+		"checklist_template",
+		"trip_roster_assignment",
+		"vehicle",
+		"column_break_context",
+		"crew_member",
+		"crew_member_name",
+		"mobile_number",
+		"status_section",
+		"status",
+		"overall_result",
+		"column_break_status",
+		"initiated_at",
+		"completed_at",
+		"evaluated_at",
+		"call_section",
+		"call_log",
+		"responses_section",
+		"responses",
+		"evaluation_section",
+		"blocker_count",
+		"warning_count",
+		"column_break_eval",
+		"flags",
+		"evaluation_notes",
+		"review_section",
+		"needs_review",
+		"review_reason",
+		"column_break_review",
+		"reviewed_by",
+		"reviewed_at",
+		"review_action",
+		"review_notes"
+	],
+	"fields": [
+		{
+			"fieldname": "context_section",
+			"fieldtype": "Section Break",
+			"label": "Context"
+		},
+		{
+			"fieldname": "checklist_template",
+			"fieldtype": "Link",
+			"label": "Checklist Template",
+			"options": "Checklist Template",
+			"reqd": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "trip_roster_assignment",
+			"fieldtype": "Link",
+			"label": "Trip Roster Assignment",
+			"options": "Trip Roster Assignment"
+		},
+		{
+			"fieldname": "vehicle",
+			"fieldtype": "Link",
+			"label": "Vehicle",
+			"options": "Vehicle"
+		},
+		{
+			"fieldname": "column_break_context",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "crew_member",
+			"fieldtype": "Link",
+			"label": "Crew Member",
+			"options": "Trip Crew Member",
+			"reqd": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "crew_member_name",
+			"fieldtype": "Data",
+			"label": "Crew Member Name",
+			"fetch_from": "crew_member.employee_name",
+			"read_only": 1
+		},
+		{
+			"fieldname": "mobile_number",
+			"fieldtype": "Data",
+			"label": "Mobile Number",
+			"fetch_from": "crew_member.mobile_number"
+		},
+		{
+			"fieldname": "status_section",
+			"fieldtype": "Section Break",
+			"label": "Status"
+		},
+		{
+			"fieldname": "status",
+			"fieldtype": "Select",
+			"label": "Status",
+			"options": "Draft\nCall Initiated\nCall Completed\nProcessing\nEvaluated\nNeeds Review\nApproved\nRejected",
+			"default": "Draft",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "overall_result",
+			"fieldtype": "Select",
+			"label": "Overall Result",
+			"options": "\nPass\nFail\nWarning\nPending Review",
+			"in_list_view": 1,
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_status",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "initiated_at",
+			"fieldtype": "Datetime",
+			"label": "Initiated At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "completed_at",
+			"fieldtype": "Datetime",
+			"label": "Completed At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "evaluated_at",
+			"fieldtype": "Datetime",
+			"label": "Evaluated At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "call_section",
+			"fieldtype": "Section Break",
+			"label": "Call"
+		},
+		{
+			"fieldname": "call_log",
+			"fieldtype": "Link",
+			"label": "Call Log",
+			"options": "Call Log",
+			"read_only": 1
+		},
+		{
+			"fieldname": "responses_section",
+			"fieldtype": "Section Break",
+			"label": "Responses"
+		},
+		{
+			"fieldname": "responses",
+			"fieldtype": "Table",
+			"label": "Responses",
+			"options": "Checklist Response"
+		},
+		{
+			"fieldname": "evaluation_section",
+			"fieldtype": "Section Break",
+			"label": "Evaluation",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "blocker_count",
+			"fieldtype": "Int",
+			"label": "Blockers",
+			"read_only": 1,
+			"default": "0"
+		},
+		{
+			"fieldname": "warning_count",
+			"fieldtype": "Int",
+			"label": "Warnings",
+			"read_only": 1,
+			"default": "0"
+		},
+		{
+			"fieldname": "column_break_eval",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "flags",
+			"fieldtype": "Small Text",
+			"label": "Flags",
+			"read_only": 1
+		},
+		{
+			"fieldname": "evaluation_notes",
+			"fieldtype": "Long Text",
+			"label": "Evaluation Notes",
+			"read_only": 1
+		},
+		{
+			"fieldname": "review_section",
+			"fieldtype": "Section Break",
+			"label": "Review",
+			"collapsible": 1,
+			"depends_on": "eval:doc.needs_review"
+		},
+		{
+			"fieldname": "needs_review",
+			"fieldtype": "Check",
+			"label": "Needs Review",
+			"read_only": 1,
+			"default": "0"
+		},
+		{
+			"fieldname": "review_reason",
+			"fieldtype": "Small Text",
+			"label": "Review Reason",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_review",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "reviewed_by",
+			"fieldtype": "Link",
+			"label": "Reviewed By",
+			"options": "User",
+			"read_only": 1
+		},
+		{
+			"fieldname": "reviewed_at",
+			"fieldtype": "Datetime",
+			"label": "Reviewed At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "review_action",
+			"fieldtype": "Select",
+			"label": "Review Action",
+			"options": "\nApproved\nEdited\nRejected\nReopened"
+		},
+		{
+			"fieldname": "review_notes",
+			"fieldtype": "Small Text",
+			"label": "Review Notes"
+		}
+	],
+	"permissions": [
+		{
+			"role": "System Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1,
+			"delete": 1
+		},
+		{
+			"role": "Fleet Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"track_changes": 1
+}

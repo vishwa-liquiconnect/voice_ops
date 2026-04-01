@@ -1,0 +1,93 @@
+{
+	"doctype": "DocType",
+	"name": "Checklist Template",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"autoname": "format:CLT-{####}",
+	"title_field": "template_name",
+	"show_name_in_global_search": 1,
+	"search_fields": "template_name,checklist_type",
+	"description": "Defines a set of checklist questions for voice-based driver operations",
+	"field_order": [
+		"template_name",
+		"checklist_type",
+		"is_active",
+		"column_break_info",
+		"language",
+		"description",
+		"questions_section",
+		"questions"
+	],
+	"fields": [
+		{
+			"fieldname": "template_name",
+			"fieldtype": "Data",
+			"label": "Template Name",
+			"reqd": 1,
+			"unique": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "checklist_type",
+			"fieldtype": "Select",
+			"label": "Checklist Type",
+			"options": "Pre-Departure\nPost-Arrival\nIncident",
+			"default": "Pre-Departure",
+			"reqd": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "is_active",
+			"fieldtype": "Check",
+			"label": "Active",
+			"default": "1",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "column_break_info",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "language",
+			"fieldtype": "Select",
+			"label": "Default Language",
+			"options": "hi-IN\nta-IN\nte-IN\nkn-IN\nen-IN",
+			"default": "hi-IN"
+		},
+		{
+			"fieldname": "description",
+			"fieldtype": "Small Text",
+			"label": "Description"
+		},
+		{
+			"fieldname": "questions_section",
+			"fieldtype": "Section Break",
+			"label": "Questions"
+		},
+		{
+			"fieldname": "questions",
+			"fieldtype": "Table",
+			"label": "Questions",
+			"options": "Checklist Question",
+			"reqd": 1
+		}
+	],
+	"permissions": [
+		{
+			"role": "System Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1,
+			"delete": 1
+		},
+		{
+			"role": "Fleet Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"track_changes": 1
+}

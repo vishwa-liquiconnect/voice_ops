@@ -1,0 +1,89 @@
+{
+	"doctype": "DocType",
+	"name": "Checklist Response",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"istable": 1,
+	"editable_grid": 1,
+	"field_order": [
+		"question_key",
+		"question_text",
+		"raw_transcript",
+		"normalized_response",
+		"confidence",
+		"response_type",
+		"is_blocker",
+		"is_warning",
+		"evaluation_result",
+		"evaluation_note"
+	],
+	"fields": [
+		{
+			"fieldname": "question_key",
+			"fieldtype": "Data",
+			"label": "Question Key",
+			"reqd": 1,
+			"in_list_view": 1,
+			"columns": 2
+		},
+		{
+			"fieldname": "question_text",
+			"fieldtype": "Small Text",
+			"label": "Question Text"
+		},
+		{
+			"fieldname": "raw_transcript",
+			"fieldtype": "Small Text",
+			"label": "Raw Transcript",
+			"in_list_view": 1,
+			"columns": 2
+		},
+		{
+			"fieldname": "normalized_response",
+			"fieldtype": "Data",
+			"label": "Normalized Response",
+			"in_list_view": 1,
+			"columns": 2
+		},
+		{
+			"fieldname": "confidence",
+			"fieldtype": "Float",
+			"label": "Confidence",
+			"in_list_view": 1,
+			"columns": 1
+		},
+		{
+			"fieldname": "response_type",
+			"fieldtype": "Select",
+			"label": "Response Type",
+			"options": "Yes/No\nNumeric\nFree Text\nSelect"
+		},
+		{
+			"fieldname": "is_blocker",
+			"fieldtype": "Check",
+			"label": "Is Blocker",
+			"default": "0"
+		},
+		{
+			"fieldname": "is_warning",
+			"fieldtype": "Check",
+			"label": "Is Warning",
+			"default": "0"
+		},
+		{
+			"fieldname": "evaluation_result",
+			"fieldtype": "Select",
+			"label": "Result",
+			"options": "\nPass\nBlocker\nWarning\nFlag\nNeeds Review",
+			"in_list_view": 1,
+			"columns": 2
+		},
+		{
+			"fieldname": "evaluation_note",
+			"fieldtype": "Small Text",
+			"label": "Note"
+		}
+	],
+	"permissions": [],
+	"track_changes": 1
+}

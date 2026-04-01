@@ -1,0 +1,91 @@
+{
+	"doctype": "DocType",
+	"name": "Checklist Question",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"istable": 1,
+	"editable_grid": 1,
+	"field_order": [
+		"question_key",
+		"question_text",
+		"question_text_hi",
+		"expected_response_type",
+		"select_options",
+		"is_blocker",
+		"is_warning",
+		"is_required",
+		"sequence"
+	],
+	"fields": [
+		{
+			"fieldname": "question_key",
+			"fieldtype": "Data",
+			"label": "Question Key",
+			"reqd": 1,
+			"in_list_view": 1,
+			"columns": 2,
+			"description": "Unique identifier e.g. driver_fitness, tyre_condition"
+		},
+		{
+			"fieldname": "question_text",
+			"fieldtype": "Small Text",
+			"label": "Question Text (English)",
+			"reqd": 1,
+			"in_list_view": 1,
+			"columns": 3
+		},
+		{
+			"fieldname": "question_text_hi",
+			"fieldtype": "Small Text",
+			"label": "Question Text (Hindi)"
+		},
+		{
+			"fieldname": "expected_response_type",
+			"fieldtype": "Select",
+			"label": "Expected Response Type",
+			"options": "Yes/No\nNumeric\nFree Text\nSelect",
+			"default": "Yes/No",
+			"reqd": 1,
+			"in_list_view": 1,
+			"columns": 2
+		},
+		{
+			"fieldname": "select_options",
+			"fieldtype": "Small Text",
+			"label": "Select Options",
+			"depends_on": "eval:doc.expected_response_type=='Select'",
+			"description": "One option per line"
+		},
+		{
+			"fieldname": "is_blocker",
+			"fieldtype": "Check",
+			"label": "Is Potential Blocker",
+			"default": "0",
+			"in_list_view": 1,
+			"columns": 1
+		},
+		{
+			"fieldname": "is_warning",
+			"fieldtype": "Check",
+			"label": "Is Warning",
+			"default": "0",
+			"description": "Mark this question as a warning-level item (does not block departure)"
+		},
+		{
+			"fieldname": "is_required",
+			"fieldtype": "Check",
+			"label": "Required",
+			"default": "1"
+		},
+		{
+			"fieldname": "sequence",
+			"fieldtype": "Int",
+			"label": "Sequence",
+			"default": "0",
+			"in_list_view": 1,
+			"columns": 1
+		}
+	],
+	"permissions": [],
+	"track_changes": 1
+}

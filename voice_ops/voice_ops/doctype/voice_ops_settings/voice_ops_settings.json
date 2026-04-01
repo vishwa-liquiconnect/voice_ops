@@ -1,0 +1,182 @@
+{
+	"doctype": "DocType",
+	"name": "Voice Ops Settings",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"issingle": 1,
+	"description": "Configuration for Voice Ops integrations and call settings",
+	"field_order": [
+		"enabled",
+		"trigger_section",
+		"call_buffer_minutes",
+		"default_checklist_template",
+		"column_break_trigger",
+		"max_call_attempts",
+		"retry_interval_minutes",
+		"post_trip_section",
+		"post_trip_checklist_template",
+		"column_break_post_trip",
+		"post_trip_buffer_minutes",
+		"sarvam_section",
+		"sarvam_api_key",
+		"column_break_sarvam",
+		"sarvam_api_url",
+		"sarvam_language_code",
+		"evaluation_section",
+		"low_confidence_threshold",
+		"escalation_section",
+		"enable_escalation",
+		"column_break_escalation",
+		"escalation_email_group"
+	],
+	"fields": [
+		{
+			"fieldname": "enabled",
+			"fieldtype": "Check",
+			"label": "Enabled",
+			"default": "0"
+		},
+		{
+			"fieldname": "trigger_section",
+			"fieldtype": "Section Break",
+			"label": "Pre-Departure Call Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "call_buffer_minutes",
+			"fieldtype": "Int",
+			"label": "Call Buffer (minutes before departure)",
+			"default": "30",
+			"description": "How many minutes before scheduled departure to trigger the checklist call"
+		},
+		{
+			"fieldname": "default_checklist_template",
+			"fieldtype": "Link",
+			"label": "Default Pre-Departure Template",
+			"options": "Checklist Template",
+			"mandatory_depends_on": "eval:doc.enabled",
+			"description": "Template used for auto-triggered pre-departure calls"
+		},
+		{
+			"fieldname": "column_break_trigger",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "max_call_attempts",
+			"fieldtype": "Int",
+			"label": "Max Call Attempts",
+			"default": "3"
+		},
+		{
+			"fieldname": "retry_interval_minutes",
+			"fieldtype": "Int",
+			"label": "Retry Interval (minutes)",
+			"default": "5"
+		},
+		{
+			"fieldname": "post_trip_section",
+			"fieldtype": "Section Break",
+			"label": "Post-Trip Call Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "post_trip_checklist_template",
+			"fieldtype": "Link",
+			"label": "Default Post-Trip Template",
+			"options": "Checklist Template",
+			"description": "Template used for auto-triggered post-arrival calls. Leave blank to disable post-trip calls."
+		},
+		{
+			"fieldname": "column_break_post_trip",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "post_trip_buffer_minutes",
+			"fieldtype": "Int",
+			"label": "Post-Trip Buffer (minutes after completion)",
+			"default": "30",
+			"description": "How many minutes after trip completion to allow triggering the post-trip call"
+		},
+		{
+			"fieldname": "sarvam_section",
+			"fieldtype": "Section Break",
+			"label": "Sarvam AI Integration",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "sarvam_api_key",
+			"fieldtype": "Password",
+			"label": "Sarvam API Key",
+			"mandatory_depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "column_break_sarvam",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "sarvam_api_url",
+			"fieldtype": "Data",
+			"label": "Sarvam API URL",
+			"default": "https://api.sarvam.ai"
+		},
+		{
+			"fieldname": "sarvam_language_code",
+			"fieldtype": "Select",
+			"label": "Default Language",
+			"options": "hi-IN\nta-IN\nte-IN\nkn-IN\nen-IN",
+			"default": "hi-IN"
+		},
+		{
+			"fieldname": "evaluation_section",
+			"fieldtype": "Section Break",
+			"label": "Evaluation Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "low_confidence_threshold",
+			"fieldtype": "Float",
+			"label": "Low Confidence Threshold",
+			"default": "0.7",
+			"description": "Transcripts below this confidence score will be flagged for review"
+		},
+		{
+			"fieldname": "escalation_section",
+			"fieldtype": "Section Break",
+			"label": "Escalation Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "enable_escalation",
+			"fieldtype": "Check",
+			"label": "Enable Escalation Notifications",
+			"default": "0",
+			"description": "Send in-app and email notifications when blockers or critical issues are detected"
+		},
+		{
+			"fieldname": "column_break_escalation",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "escalation_email_group",
+			"fieldtype": "Link",
+			"label": "Escalation Email Group",
+			"options": "Email Group",
+			"depends_on": "eval:doc.enable_escalation",
+			"description": "Email Group to notify on escalations. Leave blank for in-app notifications only."
+		}
+	],
+	"permissions": [
+		{
+			"role": "System Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1
+		},
+		{
+			"role": "Fleet Manager",
+			"read": 1,
+			"write": 1
+		}
+	],
+	"track_changes": 1
+}
