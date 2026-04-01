@@ -51,7 +51,7 @@ def transcribe_file(file_path):
 		dict with: transcript, language_code, request_id, raw_response
 	"""
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text"
+	url = f"{config['api_url']}/speech-to-text-translate"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
