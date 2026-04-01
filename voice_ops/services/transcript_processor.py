@@ -7,9 +7,11 @@ Handles multilingual yes/no detection, numeric extraction, and free text mapping
 
 import re
 
+import frappe
 
-# Language-specific synonym maps for yes/no detection
-YES_SYNONYMS = {
+
+# Built-in defaults — merged with user-configured synonyms from Voice Ops Settings
+_DEFAULT_YES_SYNONYMS = {
 	"hi-IN": {"haan", "ha", "ji", "ji haan", "bilkul", "theek", "theek hai", "sahi", "ho"},
 	"en-IN": {"yes", "yeah", "yep", "correct", "right", "ok", "okay", "sure", "affirmative"},
 	"ta-IN": {"aam", "aama", "sari", "seri"},
@@ -17,13 +19,37 @@ YES_SYNONYMS = {
 	"kn-IN": {"haudu", "howdu", "sari"},
 }
 
-NO_SYNONYMS = {
+_DEFAULT_NO_SYNONYMS = {
 	"hi-IN": {"nahi", "naa", "na", "nahi hai", "mat", "bilkul nahi"},
 	"en-IN": {"no", "nope", "not", "negative", "nah"},
 	"ta-IN": {"illa", "illai", "vendam"},
 	"te-IN": {"ledu", "kadu", "vaddu"},
 	"kn-IN": {"illa", "alla", "beda"},
 }
+
+
+def _get_synonym_maps():
+	"""Load synonyms: built-in defaults merged with user-configured entries from Voice Ops Settings."""
+	import copy
+
+	yes_map = copy.deepcopy(_DEFAULT_YES_SYNONYMS)
+	no_map = copy.deepcopy(_DEFAULT_NO_SYNONYMS)
+
+	try:
+		settings = frappe.get_single("Voice Ops Settings")
+		for row in settings.get("synonyms", []):
+			lang = row.language_code
+			word = (row.synonym or "").strip().lower()
+			if not word:
+				continue
+			if row.synonym_type == "Yes":
+				yes_map.setdefault(lang, set()).add(word)
+			else:
+				no_map.setdefault(lang, set()).add(word)
+	except Exception:
+		pass
+
+	return yes_map, no_map
 
 
 def process_transcript(transcript_text, template_questions, language_code=None):
@@ -137,6 +163,8 @@ def normalize_yes_no(text, language_code):
 
 	Returns True for yes, False for no, None if unclear.
 	"""
+	YES_SYNONYMS, NO_SYNONYMS = _get_synonym_maps()
+
 	# Check all language variants (driver may code-switch)
 	for lang in [language_code, "en-IN", "hi-IN"]:
 		yes_words = YES_SYNONYMS.get(lang, set())

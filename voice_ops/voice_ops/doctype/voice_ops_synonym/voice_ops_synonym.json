@@ -1,0 +1,46 @@
+{
+	"doctype": "DocType",
+	"name": "Voice Ops Synonym",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"istable": 1,
+	"description": "Language-specific synonym for yes/no detection in transcript processing",
+	"field_order": [
+		"language_code",
+		"synonym",
+		"column_break_syn",
+		"synonym_type"
+	],
+	"fields": [
+		{
+			"fieldname": "language_code",
+			"fieldtype": "Select",
+			"label": "Language",
+			"options": "hi-IN\nta-IN\nte-IN\nkn-IN\nen-IN",
+			"reqd": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "synonym",
+			"fieldtype": "Data",
+			"label": "Word / Phrase",
+			"reqd": 1,
+			"in_list_view": 1,
+			"description": "The word as it appears in transcripts (lowercase)"
+		},
+		{
+			"fieldname": "column_break_syn",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "synonym_type",
+			"fieldtype": "Select",
+			"label": "Means",
+			"options": "Yes\nNo",
+			"reqd": 1,
+			"in_list_view": 1
+		}
+	],
+	"permissions": [],
+	"track_changes": 0
+}

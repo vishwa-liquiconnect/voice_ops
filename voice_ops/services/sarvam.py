@@ -35,6 +35,8 @@ def get_sarvam_settings():
 	return {
 		"api_key": settings.get_password("sarvam_api_key"),
 		"api_url": settings.sarvam_api_url or "https://api.sarvam.ai",
+		"model": settings.sarvam_model or "saarika:v2.5",
+		"language_code": settings.sarvam_language_code or "unknown",
 	}
 
 
@@ -49,7 +51,7 @@ def transcribe_file(file_path):
 		dict with: transcript, language_code, request_id, raw_response
 	"""
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text-translate"
+	url = f"{config['api_url']}/speech-to-text"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
@@ -57,7 +59,11 @@ def transcribe_file(file_path):
 	try:
 		with open(file_path, "rb") as f:
 			files = {"file": (os.path.basename(file_path), f)}
-			response = requests.post(url, headers=headers, files=files, timeout=120)
+			data = {
+				"model": config["model"],
+				"language_code": config["language_code"],
+			}
+			response = requests.post(url, headers=headers, files=files, data=data, timeout=120)
 			response.raise_for_status()
 			result = response.json()
 	except requests.exceptions.RequestException as e:

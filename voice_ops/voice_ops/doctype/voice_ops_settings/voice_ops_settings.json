@@ -21,13 +21,16 @@
 		"sarvam_api_key",
 		"column_break_sarvam",
 		"sarvam_api_url",
+		"sarvam_model",
 		"sarvam_language_code",
 		"evaluation_section",
 		"low_confidence_threshold",
 		"escalation_section",
 		"enable_escalation",
 		"column_break_escalation",
-		"escalation_email_group"
+		"escalation_email_group",
+		"synonym_section",
+		"synonyms"
 	],
 	"fields": [
 		{
@@ -120,6 +123,13 @@
 			"default": "https://api.sarvam.ai"
 		},
 		{
+			"fieldname": "sarvam_model",
+			"fieldtype": "Data",
+			"label": "Sarvam Model",
+			"default": "saarika:v2.5",
+			"description": "STT model to use (e.g. saarika:v2.5, saaras:v3)"
+		},
+		{
 			"fieldname": "sarvam_language_code",
 			"fieldtype": "Select",
 			"label": "Default Language",
@@ -163,6 +173,19 @@
 			"options": "Email Group",
 			"depends_on": "eval:doc.enable_escalation",
 			"description": "Email Group to notify on escalations. Leave blank for in-app notifications only."
+		},
+		{
+			"fieldname": "synonym_section",
+			"fieldtype": "Section Break",
+			"label": "Yes/No Synonyms",
+			"depends_on": "eval:doc.enabled",
+			"description": "Add language-specific words that mean Yes or No. These are merged with built-in defaults."
+		},
+		{
+			"fieldname": "synonyms",
+			"fieldtype": "Table",
+			"label": "Synonyms",
+			"options": "Voice Ops Synonym"
 		}
 	],
 	"permissions": [
