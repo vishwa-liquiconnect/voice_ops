@@ -25,6 +25,7 @@ def initiate_call(to_number, reference_doctype=None, reference_name=None):
 		Twilio Call Log document name
 	"""
 	from twilio_integration.twilio_integration.doctype.twilio_call_log.twilio_call_log import (
+		force_https,
 		initiate_twilio_call,
 		normalize_mobile_no,
 	)
@@ -32,7 +33,7 @@ def initiate_call(to_number, reference_doctype=None, reference_name=None):
 	to_number = normalize_mobile_no(to_number)
 
 	site_url = get_url()
-	twiml_url = f"{site_url}/api/method/voice_ops.api.twilio_webhook.twiml_response"
+	twiml_url = force_https(f"{site_url}/api/method/voice_ops.api.twilio_webhook.twiml_response")
 
 	result = initiate_twilio_call(
 		to_number=to_number,

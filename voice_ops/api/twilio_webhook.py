@@ -18,8 +18,9 @@ def twiml_response():
 	Plays a greeting and records the driver's response.
 	The recording callback points back to our recording_callback endpoint.
 	"""
+	from twilio_integration.twilio_integration.doctype.twilio_call_log.twilio_call_log import force_https
 	site_url = get_url()
-	recording_callback_url = f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback"
+	recording_callback_url = force_https(f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback")
 
 	twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
