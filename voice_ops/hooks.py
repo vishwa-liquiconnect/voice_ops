@@ -5,18 +5,9 @@ app_description = "Multilingual AI-driven driver operations platform for interci
 app_email = "admin@lnder.in"
 app_license = "mit"
 
-required_apps = ["frappe", "erpnext", "exotel_integration"]
+required_apps = ["frappe", "erpnext", "twilio_integration"]
 
 after_install = "voice_ops.setup.after_install"
-
-# Document Events
-# ----------------
-# Hook into Call Log to detect call completion and trigger processing
-doc_events = {
-	"Call Log": {
-		"on_update": "voice_ops.jobs.call_log_handler.on_call_log_update",
-	},
-}
 
 # Scheduled Tasks
 # ---------------

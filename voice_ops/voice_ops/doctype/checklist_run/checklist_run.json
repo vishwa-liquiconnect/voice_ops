@@ -144,8 +144,8 @@
 		{
 			"fieldname": "call_log",
 			"fieldtype": "Link",
-			"label": "Call Log",
-			"options": "Call Log",
+			"label": "Twilio Call Log",
+			"options": "Twilio Call Log",
 			"read_only": 1
 		},
 		{

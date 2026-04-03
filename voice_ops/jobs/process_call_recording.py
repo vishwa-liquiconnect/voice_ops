@@ -2,8 +2,8 @@
 Background Job: Process Call Recording
 
 Pipeline:
-1. Download recording from Exotel → attach as File (auto S3 via frappe_s3_attachment)
-2. Send file to Sarvam AI speech-to-text-translate → get transcript
+1. Download recording from Twilio -> attach as File (auto S3 via frappe_s3_attachment)
+2. Send file to Sarvam AI speech-to-text-translate -> get transcript
 3. Process transcript against template questions
 4. Evaluate business rules
 5. Route to review queue if needed
@@ -20,13 +20,13 @@ from voice_ops.services.sarvam import transcribe_bytes
 from voice_ops.services.transcript_processor import process_transcript
 
 
-def process(call_log_name, recording_url, checklist_run_name=None):
+def process(twilio_log_name, recording_url, checklist_run_name=None):
 	"""Main background job entry point."""
 	try:
-		call_log = frappe.get_doc("Call Log", call_log_name)
-
 		if not checklist_run_name:
-			checklist_run_name = _find_checklist_run(call_log)
+			checklist_run_name = frappe.db.get_value(
+				"Twilio Call Log", twilio_log_name, "reference_name"
+			)
 
 		if not checklist_run_name:
 			return
@@ -40,7 +40,7 @@ def process(call_log_name, recording_url, checklist_run_name=None):
 		audio_bytes = _download_recording(recording_url)
 		if not audio_bytes:
 			frappe.log_error(
-				f"Failed to download recording for Call Log {call_log_name}",
+				f"Failed to download recording for Twilio Call Log {twilio_log_name}",
 				"Voice Ops: Recording Download Failed",
 			)
 			checklist_run.status = "Call Completed"
@@ -49,15 +49,15 @@ def process(call_log_name, recording_url, checklist_run_name=None):
 			return
 
 		# Step 2: Transcribe directly from bytes (no S3 round-trip)
-		file_name = f"recording_{call_log_name}.mp3" if ".mp3" in recording_url else f"recording_{call_log_name}.wav"
+		file_name = f"recording_{twilio_log_name}.mp3" if ".mp3" in recording_url else f"recording_{twilio_log_name}.wav"
 		sarvam_result = transcribe_bytes(audio_bytes, file_name=file_name)
 
 		# Step 2b: Attach recording to S3 for archival (non-blocking)
-		download_and_attach_recording(call_log_name, recording_url, audio_bytes=audio_bytes)
+		download_and_attach_recording(twilio_log_name, recording_url, audio_bytes=audio_bytes)
 
 		if not sarvam_result.get("transcript"):
 			frappe.log_error(
-				f"Sarvam returned empty transcript for {call_log_name}: {sarvam_result}",
+				f"Sarvam returned empty transcript for {twilio_log_name}: {sarvam_result}",
 				"Voice Ops: Empty Transcript",
 			)
 
@@ -103,18 +103,8 @@ def process(call_log_name, recording_url, checklist_run_name=None):
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),
-			f"Voice Ops: Failed processing call {call_log_name}",
+			f"Voice Ops: Failed processing call {twilio_log_name}",
 		)
 		if checklist_run_name:
 			frappe.db.set_value("Checklist Run", checklist_run_name, "status", "Call Completed")
 			frappe.db.commit()
-
-
-def _find_checklist_run(call_log):
-	"""Find the Checklist Run linked to a Call Log."""
-	for link in call_log.get("links", []):
-		if link.link_doctype == "Checklist Run" and link.link_name:
-			if frappe.db.exists("Checklist Run", link.link_name):
-				return link.link_name
-
-	return frappe.db.get_value("Checklist Run", {"call_log": call_log.name}, "name")

@@ -181,7 +181,7 @@ def transcribe_from_url(audio_url):
 	Download audio from URL, then transcribe via Sarvam.
 
 	Args:
-		audio_url: URL to the audio file (e.g. Exotel recording URL)
+		audio_url: URL to the audio file (e.g. Twilio recording URL)
 
 	Returns:
 		dict with: transcript, language_code, request_id, raw_response

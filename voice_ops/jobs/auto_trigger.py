@@ -5,14 +5,14 @@ Scheduler job that runs every 5 minutes. Finds Trip Roster Assignments
 where the scheduled departure is within the buffer window and triggers
 a pre-departure checklist call to driver_1.
 
-Per CLAUDE.md: ERPNext triggers calls via Exotel. All business decisions
+Per CLAUDE.md: ERPNext triggers calls via Twilio. All business decisions
 are deterministic. No silent failures.
 """
 
 import frappe
 from frappe.utils import now_datetime, get_datetime, add_to_date, today, getdate
 
-from voice_ops.services.exotel import initiate_call
+from voice_ops.services.twilio_service import initiate_call
 
 
 def check_and_trigger():
@@ -164,7 +164,7 @@ def _create_and_trigger(assignment, template_name):
 	run.save(ignore_permissions=True)
 	frappe.db.commit()
 
-	# Initiate call via Exotel
+	# Initiate call via Twilio
 	try:
 		call_log_name = initiate_call(
 			to_number=assignment["driver_1_mobile_number"],

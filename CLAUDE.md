@@ -7,7 +7,7 @@ This repository contains a multilingual AI-driven driver operations platform for
 Primary stack (MVP-focused):
 
 - ERPNext / Frappe = system of record + primary processing engine
-- Exotel = telephony
+- Twilio = telephony
 - Sarvam AI = STT/TTS/language handling
 
 AWS is NOT part of the MVP runtime architecture except for optional storage (e.g., S3 for attachments). It may be introduced later for scaling and reliability.
@@ -31,8 +31,8 @@ ERPNext / Frappe is the source of truth for:
 
 ERPNext is responsible for:
 
-- triggering calls via Exotel
-- receiving Exotel webhooks
+- triggering calls via Twilio
+- receiving Twilio webhooks
 - enqueueing background jobs
 - calling Sarvam APIs
 - processing transcripts
@@ -43,7 +43,7 @@ All asynchronous work MUST be handled using Frappe background jobs (RQ workers).
 
 ### External integrations
 
-Exotel handles:
+Twilio handles:
 
 - outbound/inbound telephony
 - call events/webhooks
@@ -75,9 +75,9 @@ All business decisions must be deterministic and implemented inside ERPNext.
 
 ## Runtime flow (MVP)
 
-1. ERPNext triggers a call via Exotel
+1. ERPNext triggers a call via Twilio
 2. Driver receives call and interaction is recorded
-3. Exotel sends webhook with call metadata and recording URL
+3. Twilio sends webhook with call metadata and recording URL
 4. ERPNext webhook handler immediately enqueues a background job
 5. Background job sends recording to Sarvam AI
 6. Sarvam returns transcript + confidence

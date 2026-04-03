@@ -37,7 +37,8 @@
 			"fieldname": "enabled",
 			"fieldtype": "Check",
 			"label": "Enabled",
-			"default": "0"
+			"default": "0",
+			"description": "Twilio credentials must be configured in Twilio Settings before enabling"
 		},
 		{
 			"fieldname": "trigger_section",

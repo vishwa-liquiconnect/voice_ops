@@ -5,14 +5,14 @@ Scheduler job that runs every 5 minutes. Finds Trip Roster Assignments
 where the trip has been completed (status changed to a terminal state)
 and triggers a post-arrival checklist call to driver_1.
 
-Per CLAUDE.md: ERPNext triggers calls via Exotel. All business decisions
+Per CLAUDE.md: ERPNext triggers calls via Twilio. All business decisions
 are deterministic. No silent failures.
 """
 
 import frappe
 from frappe.utils import now_datetime, add_to_date, today, getdate
 
-from voice_ops.services.exotel import initiate_call
+from voice_ops.services.twilio_service import initiate_call
 
 
 def check_and_trigger_post_trip():

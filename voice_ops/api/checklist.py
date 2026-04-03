@@ -8,13 +8,13 @@ Auto-triggering is handled by jobs/auto_trigger.py.
 import frappe
 from frappe.utils import now_datetime
 
-from voice_ops.services.exotel import initiate_call
+from voice_ops.services.twilio_service import initiate_call
 
 
 @frappe.whitelist()
 def trigger_checklist_call(checklist_run_name):
 	"""
-	Trigger an outbound Exotel call for an existing Checklist Run.
+	Trigger an outbound Twilio call for an existing Checklist Run.
 
 	The Checklist Run must be in Draft status with a valid mobile number.
 	"""
@@ -31,7 +31,7 @@ def trigger_checklist_call(checklist_run_name):
 		run.populate_responses_from_template()
 		run.save(ignore_permissions=True)
 
-	# Initiate the call via Exotel
+	# Initiate the call via Twilio
 	call_log_name = initiate_call(
 		to_number=run.mobile_number,
 		reference_doctype="Checklist Run",
