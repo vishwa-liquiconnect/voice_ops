@@ -31,7 +31,7 @@
 		"blocker_count",
 		"warning_count",
 		"column_break_eval",
-		"flags",
+		"evaluation_flags",
 		"evaluation_notes",
 		"review_section",
 		"needs_review",
@@ -184,7 +184,7 @@
 			"fieldtype": "Column Break"
 		},
 		{
-			"fieldname": "flags",
+			"fieldname": "evaluation_flags",
 			"fieldtype": "Small Text",
 			"label": "Flags",
 			"read_only": 1

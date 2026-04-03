@@ -437,7 +437,7 @@ def evaluate_checklist(checklist_run_name):
 	# Update the run
 	run.blocker_count = blocker_count
 	run.warning_count = warning_count
-	run.flags = ", ".join(flags) if flags else ""
+	run.evaluation_flags = ", ".join(flags) if flags else ""
 	run.evaluation_notes = "\n".join(notes) if notes else ""
 	run.overall_result = overall
 	run.evaluated_at = now_datetime()
