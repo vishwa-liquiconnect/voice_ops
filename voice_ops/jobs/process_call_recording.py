@@ -11,14 +11,12 @@ Pipeline:
 Per CLAUDE.md: All external calls include retry logic. No silent failures.
 """
 
-import json
-
 import frappe
 
-from voice_ops.jobs.call_log_handler import download_and_attach_recording
+from voice_ops.jobs.call_log_handler import download_and_attach_recording, _download_recording
 from voice_ops.services.escalation import process_escalations
 from voice_ops.services.rule_evaluator import evaluate_checklist
-from voice_ops.services.sarvam import transcribe_from_attachment
+from voice_ops.services.sarvam import transcribe_bytes
 from voice_ops.services.transcript_processor import process_transcript
 
 
@@ -38,9 +36,9 @@ def process(call_log_name, recording_url, checklist_run_name=None):
 		checklist_run.save(ignore_permissions=True)
 		frappe.db.commit()
 
-		# Step 1: Download recording and attach as File (auto goes to S3)
-		file_doc_name = download_and_attach_recording(call_log_name, recording_url)
-		if not file_doc_name:
+		# Step 1: Download recording bytes
+		audio_bytes = _download_recording(recording_url)
+		if not audio_bytes:
 			frappe.log_error(
 				f"Failed to download recording for Call Log {call_log_name}",
 				"Voice Ops: Recording Download Failed",
@@ -50,8 +48,12 @@ def process(call_log_name, recording_url, checklist_run_name=None):
 			frappe.db.commit()
 			return
 
-		# Step 2: Send file to Sarvam AI for transcription
-		sarvam_result = transcribe_from_attachment(file_doc_name)
+		# Step 2: Transcribe directly from bytes (no S3 round-trip)
+		file_name = f"recording_{call_log_name}.mp3" if ".mp3" in recording_url else f"recording_{call_log_name}.wav"
+		sarvam_result = transcribe_bytes(audio_bytes, file_name=file_name)
+
+		# Step 2b: Attach recording to S3 for archival (non-blocking)
+		download_and_attach_recording(call_log_name, recording_url, audio_bytes=audio_bytes)
 
 		if not sarvam_result.get("transcript"):
 			frappe.log_error(

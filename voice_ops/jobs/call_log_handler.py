@@ -48,17 +48,18 @@ def on_call_log_update(doc, method):
 	)
 
 
-def download_and_attach_recording(call_log_name, recording_url):
+def download_and_attach_recording(call_log_name, recording_url, audio_bytes=None):
 	"""
-	Download recording from Exotel and attach as a File to the Call Log.
+	Attach recording as a File to the Call Log (auto-uploaded to S3 via frappe_s3_attachment).
 
-	The frappe_s3_attachment app's after_insert hook on File doctype
-	will automatically upload it to S3 and replace the local file.
+	Args:
+		call_log_name: Call Log document name
+		recording_url: Exotel recording URL (used for download if audio_bytes not provided)
+		audio_bytes: Pre-downloaded audio content. If None, downloads from recording_url.
 
 	Returns the File document name, or None on failure.
 	"""
-	# Download the recording
-	audio_content = _download_recording(recording_url)
+	audio_content = audio_bytes or _download_recording(recording_url)
 	if not audio_content:
 		return None
 

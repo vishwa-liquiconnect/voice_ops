@@ -1,22 +1,22 @@
 """
 Sarvam AI Service
 
-Handles speech-to-text transcription via Sarvam's speech-to-text-translate API.
-Accepts audio files (wav, mp3, etc.) and returns transcript + detected language.
+Handles speech-to-text transcription via Sarvam's REST API.
 
 API Reference:
-  POST https://api.sarvam.ai/speech-to-text-translate
+  POST https://api.sarvam.ai/speech-to-text/transcribe
   Headers: api-subscription-key: <key>
-  Body: multipart/form-data with file field
+  Body: multipart/form-data with file, model, language_code
 
 Response:
   {
     "request_id": "...",
     "transcript": "...",
-    "language_code": "ta-IN",
-    "diarized_transcript": null,
-    "language_probability": null
+    "language_code": "ta-IN"
   }
+
+Note: REST API supports audio up to ~30s. For longer recordings,
+the batch API (sarvamai SDK) should be used — see transcribe_bytes_batch().
 """
 
 import os
@@ -40,32 +40,122 @@ def get_sarvam_settings():
 	}
 
 
+def _get_mime_type(file_name):
+	"""Determine MIME type from file name."""
+	ext = os.path.splitext(file_name)[1].lower()
+	return {
+		".mp3": "audio/mpeg",
+		".wav": "audio/wav",
+		".ogg": "audio/ogg",
+		".flac": "audio/flac",
+		".m4a": "audio/mp4",
+	}.get(ext, "audio/wav")
+
+
 def transcribe_file(file_path):
 	"""
-	Transcribe an audio file using Sarvam AI speech-to-text-translate.
+	Transcribe an audio file on disk via Sarvam REST API.
 
 	Args:
-		file_path: Absolute path to the audio file on disk
+		file_path: Absolute path to the audio file
 
 	Returns:
 		dict with: transcript, language_code, request_id, raw_response
 	"""
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text-translate"
+	url = f"{config['api_url']}/speech-to-text/transcribe"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
 
 	try:
 		with open(file_path, "rb") as f:
-			files = {"file": (os.path.basename(file_path), f)}
+			mime = _get_mime_type(file_path)
+			files = {"file": (os.path.basename(file_path), f, mime)}
 			data = {
 				"model": config["model"],
 				"language_code": config["language_code"],
 			}
 			response = requests.post(url, headers=headers, files=files, data=data, timeout=120)
-			response.raise_for_status()
+			if not response.ok:
+				error_detail = response.text
+				frappe.log_error(
+					f"Sarvam STT API returned {response.status_code}: {error_detail}",
+					"Voice Ops: Sarvam Transcription Failed",
+				)
+				return {
+					"transcript": "",
+					"language_code": "",
+					"request_id": "",
+					"raw_response": {"error": error_detail, "status_code": response.status_code},
+				}
 			result = response.json()
+	except requests.exceptions.RequestException as e:
+		frappe.log_error(
+			f"Sarvam STT API failed: {e}",
+			"Voice Ops: Sarvam Transcription Failed",
+		)
+		return {
+			"transcript": "",
+			"language_code": "",
+			"request_id": "",
+			"raw_response": {"error": str(e)},
+		}
+
+	return {
+		"transcript": result.get("transcript", ""),
+		"language_code": result.get("language_code", ""),
+		"request_id": result.get("request_id", ""),
+		"raw_response": result,
+	}
+
+
+def transcribe_bytes(audio_bytes, file_name="audio.wav"):
+	"""
+	Transcribe raw audio bytes via Sarvam REST API.
+
+	Args:
+		audio_bytes: Raw audio content (bytes)
+		file_name: Filename hint for the API (determines MIME type)
+
+	Returns:
+		dict with: transcript, language_code, request_id, raw_response
+	"""
+	if not audio_bytes:
+		return {
+			"transcript": "",
+			"language_code": "",
+			"request_id": "",
+			"raw_response": {"error": "Empty audio bytes"},
+		}
+
+	config = get_sarvam_settings()
+	url = f"{config['api_url']}/speech-to-text/transcribe"
+	headers = {
+		"api-subscription-key": config["api_key"],
+	}
+
+	try:
+		mime = _get_mime_type(file_name)
+		files = {"file": (file_name, audio_bytes, mime)}
+		data = {
+			"model": config["model"],
+			"language_code": config["language_code"],
+		}
+		response = requests.post(url, headers=headers, files=files, data=data, timeout=120)
+		if not response.ok:
+			error_detail = response.text
+			frappe.log_error(
+				f"Sarvam STT API returned {response.status_code}: {error_detail}",
+				"Voice Ops: Sarvam Transcription Failed",
+			)
+			return {
+				"transcript": "",
+				"language_code": "",
+				"request_id": "",
+				"raw_response": {"error": error_detail, "status_code": response.status_code},
+			}
+		result = response.json()
 	except requests.exceptions.RequestException as e:
 		frappe.log_error(
 			f"Sarvam STT API failed: {e}",
@@ -105,52 +195,8 @@ def transcribe_from_url(audio_url):
 			"raw_response": {"error": "Failed to download audio"},
 		}
 
-	# Write to temp file and transcribe
-	suffix = ".mp3" if ".mp3" in audio_url else ".wav"
-	with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-		tmp.write(audio_content)
-		tmp_path = tmp.name
-
-	try:
-		return transcribe_file(tmp_path)
-	finally:
-		if os.path.exists(tmp_path):
-			os.remove(tmp_path)
-
-
-def transcribe_from_attachment(file_doc_name):
-	"""
-	Transcribe an audio file stored as a Frappe File attachment (in S3).
-
-	Downloads the file from S3 (via Frappe's file serving) then sends to Sarvam.
-
-	Args:
-		file_doc_name: Name of the File document
-
-	Returns:
-		dict with: transcript, language_code, request_id, raw_response
-	"""
-	file_doc = frappe.get_doc("File", file_doc_name)
-	file_content = file_doc.get_content()
-
-	if not file_content:
-		return {
-			"transcript": "",
-			"language_code": "",
-			"request_id": "",
-			"raw_response": {"error": f"Empty file: {file_doc_name}"},
-		}
-
-	suffix = os.path.splitext(file_doc.file_name or "audio.wav")[1] or ".wav"
-	with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-		tmp.write(file_content)
-		tmp_path = tmp.name
-
-	try:
-		return transcribe_file(tmp_path)
-	finally:
-		if os.path.exists(tmp_path):
-			os.remove(tmp_path)
+	file_name = "recording.mp3" if ".mp3" in audio_url else "recording.wav"
+	return transcribe_bytes(audio_content, file_name=file_name)
 
 
 def _download_audio(audio_url):

@@ -7,6 +7,8 @@ app_license = "mit"
 
 required_apps = ["frappe", "erpnext", "exotel_integration"]
 
+after_install = "voice_ops.setup.after_install"
+
 # Document Events
 # ----------------
 # Hook into Call Log to detect call completion and trigger processing
