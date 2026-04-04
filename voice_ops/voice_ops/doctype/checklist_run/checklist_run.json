@@ -201,8 +201,7 @@
 			"fieldname": "review_section",
 			"fieldtype": "Section Break",
 			"label": "Review",
-			"collapsible": 1,
-			"depends_on": "eval:doc.needs_review"
+			"collapsible": 1
 		},
 		{
 			"fieldname": "needs_review",
