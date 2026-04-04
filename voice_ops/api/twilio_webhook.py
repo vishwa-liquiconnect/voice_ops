@@ -45,12 +45,14 @@ def _get_language(checklist_run):
 
 
 def _build_question_twiml(question_text, language, callback_url, status_callback_url, timeout=10):
-	"""Build TwiML for asking a question and recording the answer."""
-	max_length = timeout * 6
+	"""Build TwiML for asking a question and recording the answer.
+	timeout = seconds of silence before stopping the recording.
+	maxLength is fixed at 30s — enough for any single answer.
+	"""
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{question_text}</Say>
-	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
+	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="30" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila. Agla sawaal.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
@@ -122,14 +124,13 @@ def twiml_response():
 			else "Hello. Your checklist is starting."
 		)
 		timeout = questions[0].response_timeout or 10
-		max_length = timeout * 6
 
 		twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{greeting}</Say>
 	<Pause length="1"/>
 	<Say language="{language}">{first_question}</Say>
-	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
+	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="30" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
