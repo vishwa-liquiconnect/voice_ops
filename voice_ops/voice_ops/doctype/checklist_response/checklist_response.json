@@ -88,8 +88,7 @@
 			"fieldname": "recording_url",
 			"fieldtype": "Data",
 			"label": "Recording URL",
-			"read_only": 1,
-			"hidden": 1
+			"read_only": 1
 		}
 	],
 	"permissions": [],
