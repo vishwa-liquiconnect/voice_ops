@@ -24,6 +24,7 @@
 		"column_break_sarvam",
 		"sarvam_api_url",
 		"sarvam_model",
+		"sarvam_mode",
 		"sarvam_language_code",
 		"evaluation_section",
 		"low_confidence_threshold",
@@ -141,10 +142,19 @@
 		},
 		{
 			"fieldname": "sarvam_model",
-			"fieldtype": "Data",
+			"fieldtype": "Select",
 			"label": "Sarvam Model",
-			"default": "saarika:v2.5",
-			"description": "STT model to use (e.g. saarika:v2.5, saaras:v3)"
+			"options": "saaras:v3\nsaarika:v2.5",
+			"default": "saaras:v3",
+			"description": "saaras:v3 supports translate/transcribe modes. saarika:v2.5 is legacy (transcribe only)."
+		},
+		{
+			"fieldname": "sarvam_mode",
+			"fieldtype": "Select",
+			"label": "Sarvam Mode",
+			"options": "translate\ntranscribe\nverbatim",
+			"default": "translate",
+			"description": "translate = any Indian language to English. transcribe = keep original language. verbatim = exact speech."
 		},
 		{
 			"fieldname": "sarvam_language_code",

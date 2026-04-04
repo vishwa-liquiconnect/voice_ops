@@ -35,8 +35,9 @@ def get_sarvam_settings():
 	return {
 		"api_key": settings.get_password("sarvam_api_key"),
 		"api_url": settings.sarvam_api_url or "https://api.sarvam.ai",
-		"model": settings.sarvam_model or "saarika:v2.5",
+		"model": settings.sarvam_model or "saaras:v3",
 		"language_code": settings.sarvam_language_code or "unknown",
+		"mode": settings.sarvam_mode or "translate",
 	}
 
 
@@ -75,6 +76,7 @@ def transcribe_file(file_path):
 			data = {
 				"model": config["model"],
 				"language_code": config["language_code"],
+				"mode": config["mode"],
 			}
 			response = requests.post(url, headers=headers, files=files, data=data, timeout=120)
 			if not response.ok:
