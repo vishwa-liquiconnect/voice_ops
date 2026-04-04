@@ -160,8 +160,9 @@
 			"fieldname": "sarvam_language_code",
 			"fieldtype": "Select",
 			"label": "Default Language",
-			"options": "hi-IN\nta-IN\nte-IN\nkn-IN\nen-IN",
-			"default": "hi-IN"
+			"options": "unknown\nhi-IN\nta-IN\nte-IN\nkn-IN\nen-IN",
+			"default": "unknown",
+			"description": "Set to 'unknown' for auto-detection (recommended with saaras:v3)"
 		},
 		{
 			"fieldname": "evaluation_section",
