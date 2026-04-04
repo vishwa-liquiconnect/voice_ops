@@ -64,12 +64,17 @@ def _build_goodbye_twiml(language):
 
 
 def _build_callback_url(checklist_run_name, question_idx):
-	"""Build the HTTPS callback URL for a given question index."""
+	"""Build the HTTPS callback URL for a given question index.
+	Returns both raw URL (for Redirect) and XML-escaped URL (for attributes).
+	"""
 	site_url = get_url()
-	return _force_https(
+	raw_url = _force_https(
 		f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback"
 		f"?checklist_run={checklist_run_name}&question_idx={question_idx}"
 	)
+	# Escape & as &amp; for use inside XML attributes and content
+	xml_url = raw_url.replace("&", "&amp;")
+	return xml_url
 
 
 @frappe.whitelist(allow_guest=True)
