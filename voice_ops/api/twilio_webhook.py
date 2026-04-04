@@ -44,13 +44,13 @@ def _get_language(checklist_run):
 	) or "hi-IN"
 
 
-def _build_question_twiml(question_text, language, callback_url, timeout=10):
+def _build_question_twiml(question_text, language, callback_url, status_callback_url, timeout=10):
 	"""Build TwiML for asking a question and recording the answer."""
 	max_length = timeout * 6
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{question_text}</Say>
-	<Record action="{callback_url}" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
+	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila. Agla sawaal.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
@@ -67,17 +67,23 @@ def _build_goodbye_twiml(language, outro_text=None):
 
 
 def _build_callback_url(checklist_run_name, question_idx):
-	"""Build the HTTPS callback URL for a given question index.
-	Returns both raw URL (for Redirect) and XML-escaped URL (for attributes).
-	"""
+	"""Build the HTTPS callback URL for a given question index, XML-escaped."""
 	site_url = get_url()
 	raw_url = _force_https(
 		f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback"
 		f"?checklist_run={checklist_run_name}&question_idx={question_idx}"
 	)
-	# Escape & as &amp; for use inside XML attributes and content
-	xml_url = raw_url.replace("&", "&amp;")
-	return xml_url
+	return raw_url.replace("&", "&amp;")
+
+
+def _build_status_callback_url(checklist_run_name, question_idx):
+	"""Build the HTTPS recording status callback URL, XML-escaped."""
+	site_url = get_url()
+	raw_url = _force_https(
+		f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_status"
+		f"?checklist_run={checklist_run_name}&question_idx={question_idx}"
+	)
+	return raw_url.replace("&", "&amp;")
 
 
 @frappe.whitelist(allow_guest=True)
@@ -109,6 +115,7 @@ def twiml_response():
 		language = _get_language(checklist_run)
 		first_question = _get_question_text(questions[0], language)
 		callback_url = _build_callback_url(checklist_run_name, 0)
+		status_callback_url = _build_status_callback_url(checklist_run_name, 0)
 
 		greeting = template.intro_text or (
 			"Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN"
@@ -122,7 +129,7 @@ def twiml_response():
 	<Say language="{language}">{greeting}</Say>
 	<Pause length="1"/>
 	<Say language="{language}">{first_question}</Say>
-	<Record action="{callback_url}" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
+	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
@@ -146,10 +153,15 @@ def recording_callback():
 	try:
 		frappe.flags.ignore_permissions = True
 
-		data = frappe.form_dict
-		checklist_run_name = data.get("checklist_run")
-		question_idx = int(data.get("question_idx", 0))
-		recording_url = data.get("RecordingUrl")
+		# Query params from URL, POST body from Twilio's form-encoded data
+		args = frappe.request.args
+		form = frappe.request.form
+
+		checklist_run_name = args.get("checklist_run")
+		question_idx = int(args.get("question_idx", 0))
+		# Twilio sends RecordingUrl in POST body (action callback)
+		recording_url = form.get("RecordingUrl")
+		call_sid = form.get("CallSid")
 
 		if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
 			return Response(
@@ -177,8 +189,9 @@ def recording_callback():
 		if next_idx < len(questions):
 			next_question = _get_question_text(questions[next_idx], language)
 			next_callback_url = _build_callback_url(checklist_run_name, next_idx)
+			next_status_url = _build_status_callback_url(checklist_run_name, next_idx)
 			timeout = questions[next_idx].response_timeout or 10
-			twiml = _build_question_twiml(next_question, language, next_callback_url, timeout)
+			twiml = _build_question_twiml(next_question, language, next_callback_url, next_status_url, timeout)
 			return Response(twiml, mimetype="text/xml")
 
 		# All questions done — trigger processing
@@ -187,7 +200,6 @@ def recording_callback():
 			"completed_at": frappe.utils.now_datetime(),
 		})
 
-		call_sid = data.get("CallSid")
 		twilio_log_name = None
 		if call_sid:
 			twilio_log_name = frappe.db.get_value(
@@ -207,5 +219,52 @@ def recording_callback():
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Recording Callback Failed")
 		return Response(_ERROR_TWIML, mimetype="text/xml")
+	finally:
+		frappe.flags.ignore_permissions = False
+
+
+@frappe.whitelist(allow_guest=True)
+def recording_status():
+	"""
+	Reliable fallback: called by Twilio when the recording file is ready.
+
+	The action callback may fire before the recording is accessible.
+	This endpoint fires later when the file is truly available,
+	and stores the recording URL if not already stored.
+	"""
+	try:
+		frappe.flags.ignore_permissions = True
+
+		args = frappe.request.args
+		form = frappe.request.form
+
+		checklist_run_name = args.get("checklist_run")
+		question_idx = int(args.get("question_idx", 0))
+		recording_url = form.get("RecordingUrl")
+		recording_status = form.get("RecordingStatus")
+
+		if not checklist_run_name or not recording_url:
+			return
+
+		if recording_status and recording_status != "completed":
+			return
+
+		if not recording_url.endswith((".mp3", ".wav")):
+			recording_url = f"{recording_url}.mp3"
+
+		if not frappe.db.exists("Checklist Run", checklist_run_name):
+			return
+
+		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
+		if question_idx < len(checklist_run.responses):
+			response_row = checklist_run.responses[question_idx]
+			# Only update if not already stored (idempotent)
+			if not response_row.recording_url:
+				response_row.recording_url = recording_url
+				checklist_run.save(ignore_permissions=True)
+				frappe.db.commit()
+
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: Recording Status Failed")
 	finally:
 		frappe.flags.ignore_permissions = False
