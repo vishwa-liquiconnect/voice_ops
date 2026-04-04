@@ -41,7 +41,7 @@
 		},
 		{
 			"fieldname": "normalized_response",
-			"fieldtype": "Data",
+			"fieldtype": "Small Text",
 			"label": "Normalized Response",
 			"in_list_view": 1,
 			"columns": 2
