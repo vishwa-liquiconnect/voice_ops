@@ -66,7 +66,8 @@
 			"fieldname": "vehicle",
 			"fieldtype": "Link",
 			"label": "Vehicle",
-			"options": "Vehicle"
+			"options": "Vehicle",
+			"fetch_from": "trip_roster_assignment.vehicle"
 		},
 		{
 			"fieldname": "column_break_context",
@@ -78,7 +79,8 @@
 			"label": "Crew Member",
 			"options": "Trip Crew Member",
 			"reqd": 1,
-			"in_list_view": 1
+			"in_list_view": 1,
+			"fetch_from": "trip_roster_assignment.driver_1"
 		},
 		{
 			"fieldname": "crew_member_name",
