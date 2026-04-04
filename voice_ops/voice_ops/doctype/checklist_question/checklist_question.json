@@ -14,6 +14,7 @@
 		"is_blocker",
 		"is_warning",
 		"is_required",
+		"response_timeout",
 		"sequence"
 	],
 	"fields": [
@@ -76,6 +77,13 @@
 			"fieldtype": "Check",
 			"label": "Required",
 			"default": "1"
+		},
+		{
+			"fieldname": "response_timeout",
+			"fieldtype": "Int",
+			"label": "Response Timeout (seconds)",
+			"default": "10",
+			"description": "Seconds of silence before moving to next question. Max recording length = timeout × 6."
 		},
 		{
 			"fieldname": "sequence",

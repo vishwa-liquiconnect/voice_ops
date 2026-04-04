@@ -23,10 +23,11 @@ def _force_https(url):
 	return force_https(url)
 
 
-def _get_sorted_questions(checklist_run):
-	"""Get sorted questions from the checklist template."""
+def _get_template_and_questions(checklist_run):
+	"""Get the checklist template and its sorted questions."""
 	template = frappe.get_doc("Checklist Template", checklist_run.checklist_template)
-	return sorted(template.questions, key=lambda x: x.sequence or 0)
+	questions = sorted(template.questions, key=lambda x: x.sequence or 0)
+	return template, questions
 
 
 def _get_question_text(question, language):
@@ -43,22 +44,24 @@ def _get_language(checklist_run):
 	) or "hi-IN"
 
 
-def _build_question_twiml(question_text, language, callback_url):
+def _build_question_twiml(question_text, language, callback_url, timeout=10):
 	"""Build TwiML for asking a question and recording the answer."""
+	max_length = timeout * 6
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{question_text}</Say>
-	<Record action="{callback_url}" timeout="5" maxLength="30" playBeep="false" />
+	<Record action="{callback_url}" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila. Agla sawaal.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
 
 
-def _build_goodbye_twiml(language):
+def _build_goodbye_twiml(language, outro_text=None):
 	"""Build TwiML for the end of the checklist."""
+	goodbye = outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai."
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-	<Say language="{language}">Dhanyavaad. Aapka checklist poora ho gaya hai.</Say>
+	<Say language="{language}">{goodbye}</Say>
 	<Hangup/>
 </Response>"""
 
@@ -98,7 +101,7 @@ def twiml_response():
 		frappe.flags.ignore_permissions = True
 
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
-		questions = _get_sorted_questions(checklist_run)
+		template, questions = _get_template_and_questions(checklist_run)
 
 		if not questions:
 			return Response(_build_goodbye_twiml("hi-IN"), mimetype="text/xml")
@@ -107,14 +110,19 @@ def twiml_response():
 		first_question = _get_question_text(questions[0], language)
 		callback_url = _build_callback_url(checklist_run_name, 0)
 
-		greeting = "Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN" else "Hello. Your checklist is starting."
+		greeting = template.intro_text or (
+			"Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN"
+			else "Hello. Your checklist is starting."
+		)
+		timeout = questions[0].response_timeout or 10
+		max_length = timeout * 6
 
 		twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{greeting}</Say>
 	<Pause length="1"/>
 	<Say language="{language}">{first_question}</Say>
-	<Record action="{callback_url}" timeout="5" maxLength="30" playBeep="false" />
+	<Record action="{callback_url}" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
@@ -150,7 +158,7 @@ def recording_callback():
 			)
 
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
-		questions = _get_sorted_questions(checklist_run)
+		template, questions = _get_template_and_questions(checklist_run)
 		language = _get_language(checklist_run)
 
 		# Store recording URL on the current response row
@@ -169,7 +177,8 @@ def recording_callback():
 		if next_idx < len(questions):
 			next_question = _get_question_text(questions[next_idx], language)
 			next_callback_url = _build_callback_url(checklist_run_name, next_idx)
-			twiml = _build_question_twiml(next_question, language, next_callback_url)
+			timeout = questions[next_idx].response_timeout or 10
+			twiml = _build_question_twiml(next_question, language, next_callback_url, timeout)
 			return Response(twiml, mimetype="text/xml")
 
 		# All questions done — trigger processing
@@ -193,7 +202,7 @@ def recording_callback():
 		)
 		frappe.db.commit()
 
-		return Response(_build_goodbye_twiml(language), mimetype="text/xml")
+		return Response(_build_goodbye_twiml(language, template.outro_text), mimetype="text/xml")
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Recording Callback Failed")
