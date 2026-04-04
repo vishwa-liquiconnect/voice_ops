@@ -64,7 +64,7 @@ def transcribe_file(file_path):
 		dict with: transcript, language_code, request_id, raw_response
 	"""
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text"
+	url = f"{config['api_url']}/speech-to-text-translate" if config.get("mode") == "translate" else f"{config['api_url']}/speech-to-text"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
@@ -132,7 +132,7 @@ def transcribe_bytes(audio_bytes, file_name="audio.wav"):
 		}
 
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text"
+	url = f"{config['api_url']}/speech-to-text-translate" if config.get("mode") == "translate" else f"{config['api_url']}/speech-to-text"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
