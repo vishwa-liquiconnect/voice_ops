@@ -33,7 +33,8 @@ def initiate_call(to_number, reference_doctype=None, reference_name=None):
 	to_number = normalize_mobile_no(to_number)
 
 	site_url = get_url()
-	twiml_url = force_https(f"{site_url}/api/method/voice_ops.api.twilio_webhook.twiml_response")
+	base_url = force_https(f"{site_url}/api/method/voice_ops.api.twilio_webhook.twiml_response")
+	twiml_url = f"{base_url}?checklist_run={reference_name}" if reference_name else base_url
 
 	result = initiate_twilio_call(
 		to_number=to_number,

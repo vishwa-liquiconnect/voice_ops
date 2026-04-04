@@ -71,9 +71,6 @@ def create_and_trigger_checklist(template_name, crew_member, trip_roster_assignm
 		"vehicle": vehicle,
 	})
 	run.insert(ignore_permissions=True)
-
-	run.populate_responses_from_template()
-	run.save(ignore_permissions=True)
 	frappe.db.commit()
 
 	return trigger_checklist_call(run.name)

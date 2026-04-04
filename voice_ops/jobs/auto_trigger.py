@@ -158,10 +158,6 @@ def _create_and_trigger(assignment, template_name):
 		"status": "Draft",
 	})
 	run.insert(ignore_permissions=True)
-
-	# Populate response skeleton from template
-	run.populate_responses_from_template()
-	run.save(ignore_permissions=True)
 	frappe.db.commit()
 
 	# Initiate call via Twilio

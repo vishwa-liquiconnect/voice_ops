@@ -15,7 +15,8 @@
 		"is_blocker",
 		"is_warning",
 		"evaluation_result",
-		"evaluation_note"
+		"evaluation_note",
+		"recording_url"
 	],
 	"fields": [
 		{
@@ -82,6 +83,13 @@
 			"fieldname": "evaluation_note",
 			"fieldtype": "Small Text",
 			"label": "Note"
+		},
+		{
+			"fieldname": "recording_url",
+			"fieldtype": "Data",
+			"label": "Recording URL",
+			"read_only": 1,
+			"hidden": 1
 		}
 	],
 	"permissions": [],

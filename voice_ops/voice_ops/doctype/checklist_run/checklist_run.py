@@ -11,6 +11,11 @@ class ChecklistRun(Document):
 				"Trip Crew Member", self.crew_member, "mobile_number"
 			)
 
+	def after_insert(self):
+		if self.checklist_template and not self.responses:
+			self.populate_responses_from_template()
+			self.save(ignore_permissions=True)
+
 	def before_save(self):
 		if self.has_value_changed("review_action") and self.review_action:
 			self.reviewed_by = frappe.session.user

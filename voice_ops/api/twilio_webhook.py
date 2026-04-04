@@ -1,8 +1,10 @@
 """
 Twilio Webhook Handlers for Voice Ops
 
-1. twiml_response - Returns TwiML when call is answered (greeting + record)
-2. recording_callback - Called when recording is ready, triggers processing pipeline
+Per-question IVR flow:
+1. twiml_response - Called when call connects. Greets driver, asks first question.
+2. recording_callback - Called after each answer. Stores recording, asks next question.
+   When all questions are done, says thank you and enqueues processing.
 """
 
 import frappe
@@ -10,24 +12,90 @@ from frappe.utils import get_url
 from werkzeug.wrappers import Response
 
 
+def _force_https(url):
+	from twilio_integration.twilio_integration.doctype.twilio_call_log.twilio_call_log import force_https
+	return force_https(url)
+
+
+def _get_sorted_questions(checklist_run):
+	"""Get sorted questions from the checklist template."""
+	template = frappe.get_doc("Checklist Template", checklist_run.checklist_template)
+	return sorted(template.questions, key=lambda x: x.sequence or 0)
+
+
+def _get_question_text(question, language):
+	"""Get question text in the appropriate language."""
+	if language == "hi-IN" and question.question_text_hi:
+		return question.question_text_hi
+	return question.question_text
+
+
+def _build_question_twiml(question_text, language, callback_url):
+	"""Build TwiML for asking a question and recording the answer."""
+	return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+	<Say language="{language}">{question_text}</Say>
+	<Record action="{callback_url}" timeout="5" maxLength="30" playBeep="false" />
+	<Say language="{language}">Koi jawab nahi mila. Agla sawaal.</Say>
+	<Redirect>{callback_url}</Redirect>
+</Response>"""
+
+
+def _build_goodbye_twiml(language):
+	"""Build TwiML for the end of the checklist."""
+	return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+	<Say language="{language}">Dhanyavaad. Aapka checklist poora ho gaya hai.</Say>
+	<Hangup/>
+</Response>"""
+
+
 @frappe.whitelist(allow_guest=True)
 def twiml_response():
 	"""
-	Return TwiML instructions when Twilio connects the call.
-
-	Plays a greeting and records the driver's response.
-	The recording callback points back to our recording_callback endpoint.
+	Called when Twilio connects the call.
+	Greets the driver and asks the first checklist question.
 	"""
-	from twilio_integration.twilio_integration.doctype.twilio_call_log.twilio_call_log import force_https
+	checklist_run_name = frappe.form_dict.get("checklist_run")
+
+	if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
+		# No checklist — just record everything as before (fallback)
+		return Response(
+			'<?xml version="1.0" encoding="UTF-8"?><Response>'
+			'<Say language="hi-IN">Namaste. Recording shuru ho rahi hai.</Say>'
+			'<Record maxLength="300" playBeep="true" timeout="5" />'
+			'<Say language="hi-IN">Dhanyavaad.</Say></Response>',
+			mimetype="text/xml",
+		)
+
+	checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
+	questions = _get_sorted_questions(checklist_run)
+
+	if not questions:
+		return Response(_build_goodbye_twiml("hi-IN"), mimetype="text/xml")
+
+	template = frappe.get_doc("Checklist Template", checklist_run.checklist_template)
+	language = template.language or "hi-IN"
+
+	first_question = _get_question_text(questions[0], language)
+
 	site_url = get_url()
-	recording_callback_url = force_https(f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback")
+	callback_url = _force_https(
+		f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback"
+		f"?checklist_run={checklist_run_name}&question_idx=0"
+	)
+
+	# Greeting + first question
+	greeting = "Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN" else "Hello. Your checklist is starting."
 
 	twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-	<Say language="hi-IN">Namaste. Kripya apni checklist ke sawaalon ka jawab dein. Recording shuru ho rahi hai.</Say>
+	<Say language="{language}">{greeting}</Say>
 	<Pause length="1"/>
-	<Record maxLength="300" playBeep="true" action="{recording_callback_url}" recordingStatusCallback="{recording_callback_url}" recordingStatusCallbackMethod="POST" />
-	<Say language="hi-IN">Dhanyavaad. Aapka jawab record ho gaya hai.</Say>
+	<Say language="{language}">{first_question}</Say>
+	<Record action="{callback_url}" timeout="5" maxLength="30" playBeep="false" />
+	<Say language="{language}">Koi jawab nahi mila.</Say>
+	<Redirect>{callback_url}</Redirect>
 </Response>"""
 
 	return Response(twiml, mimetype="text/xml")
@@ -36,60 +104,70 @@ def twiml_response():
 @frappe.whitelist(allow_guest=True)
 def recording_callback():
 	"""
-	Handle Twilio recording callback.
-
-	Called via <Record action="..."> when recording finishes, and also
-	via recordingStatusCallback when the recording file is ready.
-	Finds the linked Checklist Run and enqueues transcript processing.
-
-	Must return TwiML since Twilio expects it from the action URL.
+	Called after each question's recording ends.
+	Stores the recording URL on the response row, then serves the next question.
+	When all questions are done, enqueues processing.
 	"""
 	data = frappe.form_dict
-	call_sid = data.get("CallSid")
+	checklist_run_name = data.get("checklist_run")
+	question_idx = int(data.get("question_idx", 0))
 	recording_url = data.get("RecordingUrl")
 
-	if not call_sid or not recording_url:
-		# Return thank-you TwiML even if we can't process
+	if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
 		return Response(
-			'<?xml version="1.0" encoding="UTF-8"?><Response><Say language="hi-IN">Dhanyavaad.</Say></Response>',
+			'<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
 			mimetype="text/xml",
 		)
 
-	# Twilio returns URL without extension — append .mp3
-	if not recording_url.endswith((".mp3", ".wav")):
-		recording_url = f"{recording_url}.mp3"
+	checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
+	questions = _get_sorted_questions(checklist_run)
+	template = frappe.get_doc("Checklist Template", checklist_run.checklist_template)
+	language = template.language or "hi-IN"
 
-	# Find the Twilio Call Log by call_sid
-	twilio_log_name = frappe.db.get_value(
-		"Twilio Call Log", {"call_sid": call_sid, "type": "Call"}, "name"
-	)
+	# Store recording URL on the current response row
+	if recording_url and question_idx < len(checklist_run.responses):
+		if not recording_url.endswith((".mp3", ".wav")):
+			recording_url = f"{recording_url}.mp3"
 
-	if twilio_log_name:
-		# Find linked Checklist Run
-		checklist_run_name = frappe.db.get_value(
-			"Twilio Call Log", twilio_log_name, "reference_name"
-		)
-
-		if checklist_run_name and frappe.db.exists("Checklist Run", checklist_run_name):
-			# Idempotency: skip if already processed
-			current_status = frappe.db.get_value("Checklist Run", checklist_run_name, "status")
-			if current_status not in ("Processing", "Evaluated", "Needs Review", "Approved", "Rejected"):
-				frappe.db.set_value("Checklist Run", checklist_run_name, {
-					"status": "Call Completed",
-					"completed_at": frappe.utils.now_datetime(),
-				})
-
-				frappe.enqueue(
-					"voice_ops.jobs.process_call_recording.process",
-					queue="long",
-					twilio_log_name=twilio_log_name,
-					recording_url=recording_url,
-					checklist_run_name=checklist_run_name,
-				)
-
+		response_row = checklist_run.responses[question_idx]
+		response_row.recording_url = recording_url
+		checklist_run.save(ignore_permissions=True)
 		frappe.db.commit()
 
-	return Response(
-		'<?xml version="1.0" encoding="UTF-8"?><Response><Say language="hi-IN">Dhanyavaad. Aapka jawab record ho gaya hai.</Say></Response>',
-		mimetype="text/xml",
+	# Determine next question
+	next_idx = question_idx + 1
+
+	if next_idx < len(questions):
+		# Ask the next question
+		next_question = _get_question_text(questions[next_idx], language)
+		site_url = get_url()
+		next_callback_url = _force_https(
+			f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback"
+			f"?checklist_run={checklist_run_name}&question_idx={next_idx}"
+		)
+		twiml = _build_question_twiml(next_question, language, next_callback_url)
+		return Response(twiml, mimetype="text/xml")
+
+	# All questions done — trigger processing
+	frappe.db.set_value("Checklist Run", checklist_run_name, {
+		"status": "Call Completed",
+		"completed_at": frappe.utils.now_datetime(),
+	})
+
+	# Find the Twilio Call Log
+	call_sid = data.get("CallSid")
+	twilio_log_name = None
+	if call_sid:
+		twilio_log_name = frappe.db.get_value(
+			"Twilio Call Log", {"call_sid": call_sid, "type": "Call"}, "name"
+		)
+
+	frappe.enqueue(
+		"voice_ops.jobs.process_call_recording.process",
+		queue="long",
+		twilio_log_name=twilio_log_name,
+		checklist_run_name=checklist_run_name,
 	)
+	frappe.db.commit()
+
+	return Response(_build_goodbye_twiml(language), mimetype="text/xml")

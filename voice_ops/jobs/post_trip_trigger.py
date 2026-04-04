@@ -106,9 +106,6 @@ def _create_and_trigger(assignment, template_name):
 		"status": "Draft",
 	})
 	run.insert(ignore_permissions=True)
-
-	run.populate_responses_from_template()
-	run.save(ignore_permissions=True)
 	frappe.db.commit()
 
 	try:
