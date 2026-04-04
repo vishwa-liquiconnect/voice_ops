@@ -63,7 +63,7 @@ def transcribe_file(file_path):
 		dict with: transcript, language_code, request_id, raw_response
 	"""
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text/transcribe"
+	url = f"{config['api_url']}/speech-to-text"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
@@ -80,8 +80,8 @@ def transcribe_file(file_path):
 			if not response.ok:
 				error_detail = response.text
 				frappe.log_error(
-					f"Sarvam STT API returned {response.status_code}: {error_detail}",
-					"Voice Ops: Sarvam Transcription Failed",
+					title="Voice Ops: Sarvam STT Failed",
+					message=f"File transcribe status {response.status_code}: {error_detail}",
 				)
 				return {
 					"transcript": "",
@@ -92,8 +92,8 @@ def transcribe_file(file_path):
 			result = response.json()
 	except requests.exceptions.RequestException as e:
 		frappe.log_error(
-			f"Sarvam STT API failed: {e}",
-			"Voice Ops: Sarvam Transcription Failed",
+			title="Voice Ops: Sarvam STT Failed",
+			message=f"File transcribe request error: {e}",
 		)
 		return {
 			"transcript": "",
@@ -130,7 +130,7 @@ def transcribe_bytes(audio_bytes, file_name="audio.wav"):
 		}
 
 	config = get_sarvam_settings()
-	url = f"{config['api_url']}/speech-to-text/transcribe"
+	url = f"{config['api_url']}/speech-to-text"
 	headers = {
 		"api-subscription-key": config["api_key"],
 	}
@@ -146,8 +146,8 @@ def transcribe_bytes(audio_bytes, file_name="audio.wav"):
 		if not response.ok:
 			error_detail = response.text
 			frappe.log_error(
-				f"Sarvam STT API returned {response.status_code}: {error_detail}",
-				"Voice Ops: Sarvam Transcription Failed",
+				title="Voice Ops: Sarvam STT Failed",
+				message=f"Status {response.status_code}: {error_detail}",
 			)
 			return {
 				"transcript": "",
@@ -158,8 +158,8 @@ def transcribe_bytes(audio_bytes, file_name="audio.wav"):
 		result = response.json()
 	except requests.exceptions.RequestException as e:
 		frappe.log_error(
-			f"Sarvam STT API failed: {e}",
-			"Voice Ops: Sarvam Transcription Failed",
+			title="Voice Ops: Sarvam STT Failed",
+			message=f"Bytes transcribe request error: {e}",
 		)
 		return {
 			"transcript": "",
