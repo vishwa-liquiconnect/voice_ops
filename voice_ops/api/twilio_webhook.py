@@ -44,15 +44,20 @@ def _get_language(checklist_run):
 	) or "hi-IN"
 
 
-def _build_question_twiml(question_text, language, callback_url, status_callback_url, timeout=10):
-	"""Build TwiML for asking a question and recording the answer.
-	timeout = seconds of silence before stopping the recording.
-	maxLength is fixed at 30s — enough for any single answer.
-	"""
+def _get_call_settings():
+	"""Get max_recording_length and default_response_timeout from Voice Ops Settings."""
+	return {
+		"max_recording_length": frappe.db.get_single_value("Voice Ops Settings", "max_recording_length") or 30,
+		"default_response_timeout": frappe.db.get_single_value("Voice Ops Settings", "default_response_timeout") or 5,
+	}
+
+
+def _build_question_twiml(question_text, language, callback_url, status_callback_url, timeout=5, max_length=30):
+	"""Build TwiML for asking a question and recording the answer."""
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{question_text}</Say>
-	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="30" playBeep="false" />
+	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila. Agla sawaal.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
@@ -115,6 +120,7 @@ def twiml_response():
 			return Response(_build_goodbye_twiml("hi-IN"), mimetype="text/xml")
 
 		language = _get_language(checklist_run)
+		call_settings = _get_call_settings()
 		first_question = _get_question_text(questions[0], language)
 		callback_url = _build_callback_url(checklist_run_name, 0)
 		status_callback_url = _build_status_callback_url(checklist_run_name, 0)
@@ -123,14 +129,15 @@ def twiml_response():
 			"Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN"
 			else "Hello. Your checklist is starting."
 		)
-		timeout = questions[0].response_timeout or 10
+		timeout = questions[0].response_timeout or call_settings["default_response_timeout"]
+		max_length = call_settings["max_recording_length"]
 
 		twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 	<Say language="{language}">{greeting}</Say>
 	<Pause length="1"/>
 	<Say language="{language}">{first_question}</Say>
-	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="30" playBeep="false" />
+	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
 	<Say language="{language}">Koi jawab nahi mila.</Say>
 	<Redirect>{callback_url}</Redirect>
 </Response>"""
@@ -188,11 +195,13 @@ def recording_callback():
 		next_idx = question_idx + 1
 
 		if next_idx < len(questions):
+			call_settings = _get_call_settings()
 			next_question = _get_question_text(questions[next_idx], language)
 			next_callback_url = _build_callback_url(checklist_run_name, next_idx)
 			next_status_url = _build_status_callback_url(checklist_run_name, next_idx)
-			timeout = questions[next_idx].response_timeout or 10
-			twiml = _build_question_twiml(next_question, language, next_callback_url, next_status_url, timeout)
+			timeout = questions[next_idx].response_timeout or call_settings["default_response_timeout"]
+			max_length = call_settings["max_recording_length"]
+			twiml = _build_question_twiml(next_question, language, next_callback_url, next_status_url, timeout, max_length)
 			return Response(twiml, mimetype="text/xml")
 
 		# All questions done — trigger processing

@@ -13,6 +13,8 @@
 		"column_break_trigger",
 		"max_call_attempts",
 		"retry_interval_minutes",
+		"max_recording_length",
+		"default_response_timeout",
 		"post_trip_section",
 		"post_trip_checklist_template",
 		"column_break_post_trip",
@@ -76,6 +78,20 @@
 			"fieldtype": "Int",
 			"label": "Retry Interval (minutes)",
 			"default": "5"
+		},
+		{
+			"fieldname": "max_recording_length",
+			"fieldtype": "Int",
+			"label": "Max Recording Length (seconds)",
+			"default": "30",
+			"description": "Maximum duration for a single answer recording. Hard cap regardless of silence."
+		},
+		{
+			"fieldname": "default_response_timeout",
+			"fieldtype": "Int",
+			"label": "Default Response Timeout (seconds)",
+			"default": "5",
+			"description": "Seconds of silence before moving to the next question. Can be overridden per question."
 		},
 		{
 			"fieldname": "post_trip_section",
