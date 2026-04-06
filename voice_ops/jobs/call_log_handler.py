@@ -1,15 +1,16 @@
 """
 Call Recording Handler
 
-Downloads recordings from Twilio and attaches them as Files
+Downloads recordings and attaches them as Files
 (auto-uploaded to S3 via frappe_s3_attachment).
 
-Also handles Twilio Call Log on_update to detect mid-call hangups
-and trigger processing for partial checklists.
+Handles both Twilio Call Log and Exotel Call Log on_update events
+to detect mid-call hangups and trigger processing for partial checklists.
 """
 
 import frappe
-import requests
+
+from voice_ops.services.telephony import download_and_attach_recording, download_recording
 
 
 def on_twilio_call_log_update(doc, method):
@@ -29,7 +30,34 @@ def on_twilio_call_log_update(doc, method):
 	if not doc.reference_doctype == "Checklist Run" or not doc.reference_name:
 		return
 
-	checklist_run_name = doc.reference_name
+	_handle_call_completion(doc.reference_name, doc.name)
+
+
+def on_exotel_call_log_update(doc, method):
+	"""
+	Called on Call Log (Exotel) on_update (via doc_events hook).
+
+	Same logic as Twilio handler but for Exotel's Call Log doctype.
+	"""
+	if doc.status not in ("Completed", "No Answer", "Canceled", "Failed"):
+		return
+
+	# Exotel Call Log uses 'links' child table for references
+	checklist_run_name = None
+	if hasattr(doc, "links"):
+		for link in doc.links:
+			if link.link_doctype == "Checklist Run":
+				checklist_run_name = link.link_name
+				break
+
+	if not checklist_run_name:
+		return
+
+	_handle_call_completion(checklist_run_name, doc.name)
+
+
+def _handle_call_completion(checklist_run_name, call_log_name):
+	"""Common handler for call completion from either provider."""
 	if not frappe.db.exists("Checklist Run", checklist_run_name):
 		return
 
@@ -48,78 +76,7 @@ def on_twilio_call_log_update(doc, method):
 	frappe.enqueue(
 		"voice_ops.jobs.process_call_recording.process",
 		queue="long",
-		twilio_log_name=doc.name,
+		twilio_log_name=call_log_name,
 		checklist_run_name=checklist_run_name,
 	)
 	frappe.db.commit()
-
-
-def download_and_attach_recording(twilio_log_name, recording_url, audio_bytes=None):
-	"""
-	Attach recording as a File to the Twilio Call Log.
-
-	Args:
-		twilio_log_name: Twilio Call Log document name
-		recording_url: Twilio recording URL (used for download if audio_bytes not provided)
-		audio_bytes: Pre-downloaded audio content. If None, downloads from recording_url.
-
-	Returns the File document name, or None on failure.
-	"""
-	audio_content = audio_bytes or _download_recording(recording_url)
-	if not audio_content:
-		return None
-
-	ext = ".mp3"
-	if ".wav" in recording_url:
-		ext = ".wav"
-
-	file_name = f"call_recording_{twilio_log_name}{ext}"
-
-	file_doc = frappe.get_doc({
-		"doctype": "File",
-		"file_name": file_name,
-		"content": audio_content,
-		"is_private": 1,
-		"attached_to_doctype": "Twilio Call Log",
-		"attached_to_name": twilio_log_name,
-	})
-	file_doc.insert(ignore_permissions=True)
-	frappe.db.commit()
-
-	return file_doc.name
-
-
-def _download_recording(recording_url):
-	"""Download recording from Twilio with auth and retry."""
-	auth = _get_twilio_auth(recording_url)
-
-	for attempt in range(3):
-		try:
-			response = requests.get(recording_url, auth=auth, timeout=60)
-			response.raise_for_status()
-			if len(response.content) < 100:
-				if attempt < 2:
-					import time
-					time.sleep(2)
-					continue
-			return response.content
-		except requests.exceptions.RequestException as e:
-			if attempt == 2:
-				frappe.log_error(
-					title="Voice Ops: Recording Download Failed",
-					message=f"Failed to download from {recording_url}: {e}",
-				)
-				return None
-
-
-def _get_twilio_auth(recording_url):
-	"""Get Twilio HTTP Basic Auth if the URL is a Twilio API URL."""
-	if "api.twilio.com" not in recording_url:
-		return None
-
-	from requests.auth import HTTPBasicAuth
-	settings = frappe.get_single("Twilio Settings")
-	return HTTPBasicAuth(
-		settings.account_sid,
-		settings.get_password("auth_token"),
-	)

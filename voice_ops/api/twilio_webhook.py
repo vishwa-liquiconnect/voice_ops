@@ -11,16 +11,15 @@ All doc reads use frappe.get_cached_doc or flags.ignore_permissions.
 """
 
 import frappe
-from frappe.utils import get_url
 from werkzeug.wrappers import Response
 
-# Error TwiML to avoid Twilio "application error" message
-_ERROR_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response><Say language="hi-IN">Kuch galat ho gaya. Kripya baad mein try karein.</Say><Hangup/></Response>'
-
-
-def _force_https(url):
-	from twilio_integration.twilio_integration.doctype.twilio_call_log.twilio_call_log import force_https
-	return force_https(url)
+from voice_ops.services.telephony import (
+	build_callback_url,
+	build_error_xml,
+	build_goodbye_xml,
+	build_greeting_record_xml,
+	build_say_record_xml,
+)
 
 
 def _get_template_and_questions(checklist_run):
@@ -52,47 +51,6 @@ def _get_call_settings():
 	}
 
 
-def _build_question_twiml(question_text, language, callback_url, status_callback_url, timeout=5, max_length=30):
-	"""Build TwiML for asking a question and recording the answer."""
-	return f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-	<Say language="{language}">{question_text}</Say>
-	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
-	<Say language="{language}">Koi jawab nahi mila. Agla sawaal.</Say>
-	<Redirect>{callback_url}</Redirect>
-</Response>"""
-
-
-def _build_goodbye_twiml(language, outro_text=None):
-	"""Build TwiML for the end of the checklist."""
-	goodbye = outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai."
-	return f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-	<Say language="{language}">{goodbye}</Say>
-	<Hangup/>
-</Response>"""
-
-
-def _build_callback_url(checklist_run_name, question_idx):
-	"""Build the HTTPS callback URL for a given question index, XML-escaped."""
-	site_url = get_url()
-	raw_url = _force_https(
-		f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_callback"
-		f"?checklist_run={checklist_run_name}&question_idx={question_idx}"
-	)
-	return raw_url.replace("&", "&amp;")
-
-
-def _build_status_callback_url(checklist_run_name, question_idx):
-	"""Build the HTTPS recording status callback URL, XML-escaped."""
-	site_url = get_url()
-	raw_url = _force_https(
-		f"{site_url}/api/method/voice_ops.api.twilio_webhook.recording_status"
-		f"?checklist_run={checklist_run_name}&question_idx={question_idx}"
-	)
-	return raw_url.replace("&", "&amp;")
-
-
 @frappe.whitelist(allow_guest=True)
 def twiml_response():
 	"""
@@ -117,13 +75,19 @@ def twiml_response():
 		template, questions = _get_template_and_questions(checklist_run)
 
 		if not questions:
-			return Response(_build_goodbye_twiml("hi-IN"), mimetype="text/xml")
+			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad."), mimetype="text/xml")
 
 		language = _get_language(checklist_run)
 		call_settings = _get_call_settings()
 		first_question = _get_question_text(questions[0], language)
-		callback_url = _build_callback_url(checklist_run_name, 0)
-		status_callback_url = _build_status_callback_url(checklist_run_name, 0)
+		callback_url = build_callback_url(
+			"voice_ops.api.twilio_webhook.recording_callback",
+			checklist_run=checklist_run_name, question_idx=0,
+		)
+		status_callback_url = build_callback_url(
+			"voice_ops.api.twilio_webhook.recording_status",
+			checklist_run=checklist_run_name, question_idx=0,
+		)
 
 		greeting = template.intro_text or (
 			"Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN"
@@ -132,21 +96,23 @@ def twiml_response():
 		timeout = questions[0].response_timeout or call_settings["default_response_timeout"]
 		max_length = call_settings["max_recording_length"]
 
-		twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-	<Say language="{language}">{greeting}</Say>
-	<Pause length="1"/>
-	<Say language="{language}">{first_question}</Say>
-	<Record action="{callback_url}" recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST" timeout="{timeout}" maxLength="{max_length}" playBeep="false" />
-	<Say language="{language}">Koi jawab nahi mila.</Say>
-	<Redirect>{callback_url}</Redirect>
-</Response>"""
+		twiml = build_greeting_record_xml(
+			language=language,
+			greeting_text=greeting,
+			question_text=first_question,
+			record_callback_url=callback_url,
+			status_callback_url=status_callback_url,
+			timeout=timeout,
+			max_length=max_length,
+			no_input_text="Koi jawab nahi mila." if language == "hi-IN" else "No response received.",
+			redirect_url=callback_url,
+		)
 
 		return Response(twiml, mimetype="text/xml")
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: TwiML Response Failed")
-		return Response(_ERROR_TWIML, mimetype="text/xml")
+		return Response(build_error_xml(), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
 
@@ -197,11 +163,26 @@ def recording_callback():
 		if next_idx < len(questions):
 			call_settings = _get_call_settings()
 			next_question = _get_question_text(questions[next_idx], language)
-			next_callback_url = _build_callback_url(checklist_run_name, next_idx)
-			next_status_url = _build_status_callback_url(checklist_run_name, next_idx)
+			next_callback_url = build_callback_url(
+				"voice_ops.api.twilio_webhook.recording_callback",
+				checklist_run=checklist_run_name, question_idx=next_idx,
+			)
+			next_status_url = build_callback_url(
+				"voice_ops.api.twilio_webhook.recording_status",
+				checklist_run=checklist_run_name, question_idx=next_idx,
+			)
 			timeout = questions[next_idx].response_timeout or call_settings["default_response_timeout"]
 			max_length = call_settings["max_recording_length"]
-			twiml = _build_question_twiml(next_question, language, next_callback_url, next_status_url, timeout, max_length)
+			twiml = build_say_record_xml(
+				language=language,
+				say_text=next_question,
+				record_callback_url=next_callback_url,
+				status_callback_url=next_status_url,
+				timeout=timeout,
+				max_length=max_length,
+				no_input_text="Koi jawab nahi mila. Agla sawaal." if language == "hi-IN" else "No response. Next question.",
+				redirect_url=next_callback_url,
+			)
 			return Response(twiml, mimetype="text/xml")
 
 		# All questions done — trigger processing
@@ -224,11 +205,14 @@ def recording_callback():
 		)
 		frappe.db.commit()
 
-		return Response(_build_goodbye_twiml(language, template.outro_text), mimetype="text/xml")
+		return Response(
+			build_goodbye_xml(language, template.outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai."),
+			mimetype="text/xml",
+		)
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Recording Callback Failed")
-		return Response(_ERROR_TWIML, mimetype="text/xml")
+		return Response(build_error_xml(), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
 
@@ -251,12 +235,12 @@ def recording_status():
 		checklist_run_name = args.get("checklist_run")
 		question_idx = int(args.get("question_idx", 0))
 		recording_url = form.get("RecordingUrl")
-		recording_status = form.get("RecordingStatus")
+		rec_status = form.get("RecordingStatus")
 
 		if not checklist_run_name or not recording_url:
 			return
 
-		if recording_status and recording_status != "completed":
+		if rec_status and rec_status != "completed":
 			return
 
 		if not recording_url.endswith((".mp3", ".wav")):

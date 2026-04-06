@@ -7,6 +7,7 @@
 	"description": "Configuration for Voice Ops integrations and call settings",
 	"field_order": [
 		"enabled",
+		"telephony_provider",
 		"trigger_section",
 		"call_buffer_minutes",
 		"default_checklist_template",
@@ -33,7 +34,21 @@
 		"column_break_escalation",
 		"escalation_email_group",
 		"synonym_section",
-		"synonyms"
+		"synonyms",
+		"inbound_section",
+		"enable_inbound_calls",
+		"inbound_greeting_language",
+		"column_break_inbound",
+		"inbound_query_max_length",
+		"notification_section",
+		"enable_whatsapp_notifications",
+		"twilio_whatsapp_number",
+		"column_break_notification",
+		"enable_email_notifications",
+		"md_phone",
+		"md_email",
+		"ai_section",
+		"anthropic_api_key"
 	],
 	"fields": [
 		{
@@ -41,7 +56,16 @@
 			"fieldtype": "Check",
 			"label": "Enabled",
 			"default": "0",
-			"description": "Twilio credentials must be configured in Twilio Settings before enabling"
+			"description": "Configure credentials in Twilio Settings or Exotel Settings based on selected provider"
+		},
+		{
+			"fieldname": "telephony_provider",
+			"fieldtype": "Select",
+			"label": "Telephony Provider",
+			"options": "Twilio\nExotel",
+			"default": "Twilio",
+			"depends_on": "eval:doc.enabled",
+			"description": "Select the telephony provider for call handling"
 		},
 		{
 			"fieldname": "trigger_section",
@@ -214,6 +238,96 @@
 			"fieldtype": "Table",
 			"label": "Synonyms",
 			"options": "Voice Ops Synonym"
+		},
+		{
+			"fieldname": "inbound_section",
+			"fieldtype": "Section Break",
+			"label": "Inbound Call Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "enable_inbound_calls",
+			"fieldtype": "Check",
+			"label": "Enable Inbound Calls",
+			"default": "0",
+			"description": "Allow drivers to call in with queries. Configure the inbound number in your telephony provider's dashboard."
+		},
+		{
+			"fieldname": "inbound_greeting_language",
+			"fieldtype": "Select",
+			"label": "Inbound Greeting Language",
+			"options": "hi-IN\nen-IN\nta-IN\nte-IN\nkn-IN",
+			"default": "hi-IN",
+			"depends_on": "eval:doc.enable_inbound_calls",
+			"description": "Language for IVR prompts during inbound calls"
+		},
+		{
+			"fieldname": "column_break_inbound",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "inbound_query_max_length",
+			"fieldtype": "Int",
+			"label": "Max Query Recording (seconds)",
+			"default": "120",
+			"depends_on": "eval:doc.enable_inbound_calls",
+			"description": "Maximum duration for the driver's free-speech query recording"
+		},
+		{
+			"fieldname": "notification_section",
+			"fieldtype": "Section Break",
+			"label": "Notification Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "enable_whatsapp_notifications",
+			"fieldtype": "Check",
+			"label": "Enable WhatsApp Notifications",
+			"default": "0",
+			"description": "Send query notifications via WhatsApp (uses Twilio Messages API)"
+		},
+		{
+			"fieldname": "twilio_whatsapp_number",
+			"fieldtype": "Data",
+			"label": "Twilio WhatsApp Sender",
+			"depends_on": "eval:doc.enable_whatsapp_notifications",
+			"description": "Twilio WhatsApp-enabled number (e.g. whatsapp:+14155238886)"
+		},
+		{
+			"fieldname": "column_break_notification",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "enable_email_notifications",
+			"fieldtype": "Check",
+			"label": "Enable Email Notifications",
+			"default": "0",
+			"description": "Send query notifications via email"
+		},
+		{
+			"fieldname": "md_phone",
+			"fieldtype": "Data",
+			"label": "MD Phone (WhatsApp)",
+			"description": "Managing Director's phone number with country code (e.g. +919876543210)"
+		},
+		{
+			"fieldname": "md_email",
+			"fieldtype": "Data",
+			"label": "MD Email",
+			"options": "Email",
+			"description": "Managing Director's email address for notifications"
+		},
+		{
+			"fieldname": "ai_section",
+			"fieldtype": "Section Break",
+			"label": "AI Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "anthropic_api_key",
+			"fieldtype": "Password",
+			"label": "Anthropic API Key",
+			"description": "API key for Claude-based query summarization"
 		}
 	],
 	"permissions": [

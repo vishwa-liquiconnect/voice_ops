@@ -5,16 +5,19 @@ app_description = "Multilingual AI-driven driver operations platform for interci
 app_email = "admin@lnder.in"
 app_license = "mit"
 
-required_apps = ["frappe", "erpnext", "twilio_integration"]
+required_apps = ["frappe", "erpnext"]
 
 after_install = "voice_ops.setup.after_install"
 
 # Document Events
 # ----------------
-# When Twilio call ends, check if linked Checklist Run needs processing
+# Detect call completion and trigger processing for linked Checklist Runs
 doc_events = {
 	"Twilio Call Log": {
 		"on_update": "voice_ops.jobs.call_log_handler.on_twilio_call_log_update",
+	},
+	"Call Log": {
+		"on_update": "voice_ops.jobs.call_log_handler.on_exotel_call_log_update",
 	},
 }
 

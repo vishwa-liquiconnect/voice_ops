@@ -1,0 +1,273 @@
+{
+	"doctype": "DocType",
+	"name": "Driver Query",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"autoname": "DQ-.####",
+	"description": "Inbound driver/employee query recorded via phone call",
+	"field_order": [
+		"caller_section",
+		"caller_phone",
+		"crew_member",
+		"crew_member_name",
+		"column_break_caller",
+		"verbal_name",
+		"verbal_bus",
+		"vehicle",
+		"call_section",
+		"call_sid",
+		"status",
+		"column_break_call",
+		"called_at",
+		"processed_at",
+		"recording_section",
+		"name_recording_url",
+		"bus_recording_url",
+		"query_recording_url",
+		"transcription_section",
+		"name_transcript",
+		"bus_transcript",
+		"column_break_transcript",
+		"detected_language",
+		"query_transcript",
+		"summary_section",
+		"query_summary",
+		"column_break_summary",
+		"trip_roster_assignment",
+		"route_manager",
+		"notification_section",
+		"md_notified",
+		"route_manager_notified",
+		"column_break_notif",
+		"notification_error"
+	],
+	"fields": [
+		{
+			"fieldname": "caller_section",
+			"fieldtype": "Section Break",
+			"label": "Caller Information"
+		},
+		{
+			"fieldname": "caller_phone",
+			"fieldtype": "Data",
+			"label": "Caller Phone",
+			"read_only": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "crew_member",
+			"fieldtype": "Link",
+			"label": "Crew Member",
+			"options": "Trip Crew Member",
+			"read_only": 1
+		},
+		{
+			"fieldname": "crew_member_name",
+			"fieldtype": "Data",
+			"label": "Crew Member Name",
+			"fetch_from": "crew_member.employee_name",
+			"read_only": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "column_break_caller",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "verbal_name",
+			"fieldtype": "Data",
+			"label": "Verbal Name",
+			"read_only": 1,
+			"description": "Name as spoken by the caller (transcribed)"
+		},
+		{
+			"fieldname": "verbal_bus",
+			"fieldtype": "Data",
+			"label": "Verbal Bus",
+			"read_only": 1,
+			"description": "Bus/vehicle as spoken by the caller (transcribed)"
+		},
+		{
+			"fieldname": "vehicle",
+			"fieldtype": "Link",
+			"label": "Vehicle",
+			"options": "Vehicle",
+			"read_only": 1
+		},
+		{
+			"fieldname": "call_section",
+			"fieldtype": "Section Break",
+			"label": "Call Details"
+		},
+		{
+			"fieldname": "call_sid",
+			"fieldtype": "Data",
+			"label": "Call SID",
+			"read_only": 1
+		},
+		{
+			"fieldname": "status",
+			"fieldtype": "Select",
+			"label": "Status",
+			"options": "Draft\nRecording\nProcessing\nProcessed\nFailed",
+			"default": "Draft",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_call",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "called_at",
+			"fieldtype": "Datetime",
+			"label": "Called At",
+			"read_only": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "processed_at",
+			"fieldtype": "Datetime",
+			"label": "Processed At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "recording_section",
+			"fieldtype": "Section Break",
+			"label": "Recordings",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "name_recording_url",
+			"fieldtype": "Data",
+			"label": "Name Recording URL",
+			"read_only": 1
+		},
+		{
+			"fieldname": "bus_recording_url",
+			"fieldtype": "Data",
+			"label": "Bus Recording URL",
+			"read_only": 1
+		},
+		{
+			"fieldname": "query_recording_url",
+			"fieldtype": "Data",
+			"label": "Query Recording URL",
+			"read_only": 1
+		},
+		{
+			"fieldname": "transcription_section",
+			"fieldtype": "Section Break",
+			"label": "Transcription"
+		},
+		{
+			"fieldname": "name_transcript",
+			"fieldtype": "Small Text",
+			"label": "Name Transcript",
+			"read_only": 1
+		},
+		{
+			"fieldname": "bus_transcript",
+			"fieldtype": "Small Text",
+			"label": "Bus Transcript",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_transcript",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "detected_language",
+			"fieldtype": "Data",
+			"label": "Detected Language",
+			"read_only": 1
+		},
+		{
+			"fieldname": "query_transcript",
+			"fieldtype": "Long Text",
+			"label": "Query Transcript",
+			"read_only": 1,
+			"description": "Full English transcript of the driver's query"
+		},
+		{
+			"fieldname": "summary_section",
+			"fieldtype": "Section Break",
+			"label": "Summary & Context"
+		},
+		{
+			"fieldname": "query_summary",
+			"fieldtype": "Long Text",
+			"label": "Query Summary",
+			"read_only": 1,
+			"description": "AI-generated summary of the query"
+		},
+		{
+			"fieldname": "column_break_summary",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "trip_roster_assignment",
+			"fieldtype": "Link",
+			"label": "Trip Roster Assignment",
+			"options": "Trip Roster Assignment",
+			"read_only": 1
+		},
+		{
+			"fieldname": "route_manager",
+			"fieldtype": "Link",
+			"label": "Route Manager",
+			"options": "Employee",
+			"read_only": 1,
+			"description": "Operations incharge resolved from today's trip"
+		},
+		{
+			"fieldname": "notification_section",
+			"fieldtype": "Section Break",
+			"label": "Notification Status",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "md_notified",
+			"fieldtype": "Check",
+			"label": "MD Notified",
+			"default": "0",
+			"read_only": 1
+		},
+		{
+			"fieldname": "route_manager_notified",
+			"fieldtype": "Check",
+			"label": "Route Manager Notified",
+			"default": "0",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_notif",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "notification_error",
+			"fieldtype": "Small Text",
+			"label": "Notification Error",
+			"read_only": 1
+		}
+	],
+	"permissions": [
+		{
+			"role": "System Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1,
+			"delete": 1
+		},
+		{
+			"role": "Fleet Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "called_at",
+	"sort_order": "DESC",
+	"track_changes": 1
+}

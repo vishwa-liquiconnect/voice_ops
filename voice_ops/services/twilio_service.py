@@ -1,47 +1,42 @@
 """
 Twilio Service
 
-Thin wrapper around twilio_integration's initiate_twilio_call.
-Uses Twilio Settings for credentials and Twilio Call Log for tracking.
+Thin wrapper that delegates to the telephony abstraction layer.
+Kept for backward compatibility with existing callers.
 """
 
 import frappe
 from frappe.utils import get_url
 
+from voice_ops.services.telephony import force_https, initiate_call as _initiate_call
+
 
 def initiate_call(to_number, reference_doctype=None, reference_name=None):
 	"""
-	Initiate an automated outbound call via Twilio.
-
-	Uses twilio_integration app's initiate_twilio_call which handles
-	credentials, Call Log creation, and retry logic.
+	Initiate an automated outbound call via the configured telephony provider.
 
 	Args:
 		to_number: Driver's mobile number
-		reference_doctype: DocType to link in Twilio Call Log (e.g. "Checklist Run")
+		reference_doctype: DocType to link in call log (e.g. "Checklist Run")
 		reference_name: Document name to link
 
 	Returns:
-		Twilio Call Log document name
+		Call log document name
 	"""
-	from twilio_integration.twilio_integration.doctype.twilio_call_log.twilio_call_log import (
-		force_https,
-		initiate_twilio_call,
-		normalize_mobile_no,
-	)
-
-	to_number = normalize_mobile_no(to_number)
-
 	site_url = get_url()
-	base_url = force_https(f"{site_url}/api/method/voice_ops.api.twilio_webhook.twiml_response")
-	twiml_url = f"{base_url}?checklist_run={reference_name}" if reference_name else base_url
+	provider = frappe.db.get_single_value("Voice Ops Settings", "telephony_provider") or "Twilio"
 
-	result = initiate_twilio_call(
+	if provider == "Exotel":
+		endpoint = "voice_ops.api.exotel_webhook.exoml_response"
+	else:
+		endpoint = "voice_ops.api.twilio_webhook.twiml_response"
+
+	base_url = force_https(f"{site_url}/api/method/{endpoint}")
+	callback_url = f"{base_url}?checklist_run={reference_name}" if reference_name else base_url
+
+	return _initiate_call(
 		to_number=to_number,
-		twiml_url=twiml_url,
-		purpose="Voice Ops Checklist",
+		twiml_url=callback_url,
 		reference_doctype=reference_doctype,
 		reference_name=reference_name,
 	)
-
-	return result.get("log")

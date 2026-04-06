@@ -14,7 +14,7 @@ Per CLAUDE.md: All external calls include retry logic. No silent failures.
 
 import frappe
 
-from voice_ops.jobs.call_log_handler import download_and_attach_recording, _download_recording
+from voice_ops.services.telephony import download_and_attach_recording, download_recording
 from voice_ops.services.escalation import process_escalations
 from voice_ops.services.rule_evaluator import evaluate_checklist
 from voice_ops.services.sarvam import transcribe_bytes
@@ -76,7 +76,7 @@ def process(twilio_log_name=None, recording_url=None, checklist_run_name=None):
 
 def _process_single_response(response, language_code, twilio_log_name=None):
 	"""Download, transcribe, and normalize a single question's recording."""
-	audio_bytes = _download_recording(response.recording_url)
+	audio_bytes = download_recording(response.recording_url)
 	if not audio_bytes or len(audio_bytes) < 100:
 		response.raw_transcript = ""
 		response.normalized_response = ""

@@ -10,6 +10,7 @@ Per CLAUDE.md: Failed jobs must be logged and retried.
 import frappe
 from frappe.utils import now_datetime
 
+from voice_ops.services.telephony import get_provider
 from voice_ops.services.twilio_service import initiate_call
 
 
@@ -25,24 +26,41 @@ def process_pending_retries():
 	settings = frappe.get_single("Voice Ops Settings")
 	max_attempts = settings.max_call_attempts or 3
 
-	# Find Checklist Runs in "Call Initiated" status whose Twilio Call Log
-	# has a terminal failure status
-	failed_runs = frappe.db.sql("""
-		SELECT
-			cr.name AS checklist_run,
-			cr.mobile_number,
-			cr.call_log,
-			tcl.call_status,
-			tcl.attempt_no
-		FROM `tabChecklist Run` cr
-		LEFT JOIN `tabTwilio Call Log` tcl ON cr.call_log = tcl.name
-		WHERE
-			cr.status = 'Call Initiated'
-			AND tcl.call_status IN ('no-answer', 'busy', 'failed', 'canceled', 'max_attempts_reached')
-			AND cr.mobile_number IS NOT NULL
-			AND cr.mobile_number != ''
-		LIMIT 10
-	""", as_dict=True)
+	# Query differs by provider due to different call log doctypes
+	provider = get_provider()
+	if provider == "Exotel":
+		failed_runs = frappe.db.sql("""
+			SELECT
+				cr.name AS checklist_run,
+				cr.mobile_number,
+				cr.call_log,
+				cl.status AS call_status
+			FROM `tabChecklist Run` cr
+			LEFT JOIN `tabCall Log` cl ON cr.call_log = cl.name
+			WHERE
+				cr.status = 'Call Initiated'
+				AND cl.status IN ('No Answer', 'Canceled', 'Failed')
+				AND cr.mobile_number IS NOT NULL
+				AND cr.mobile_number != ''
+			LIMIT 10
+		""", as_dict=True)
+	else:
+		failed_runs = frappe.db.sql("""
+			SELECT
+				cr.name AS checklist_run,
+				cr.mobile_number,
+				cr.call_log,
+				tcl.call_status,
+				tcl.attempt_no
+			FROM `tabChecklist Run` cr
+			LEFT JOIN `tabTwilio Call Log` tcl ON cr.call_log = tcl.name
+			WHERE
+				cr.status = 'Call Initiated'
+				AND tcl.call_status IN ('no-answer', 'busy', 'failed', 'canceled', 'max_attempts_reached')
+				AND cr.mobile_number IS NOT NULL
+				AND cr.mobile_number != ''
+			LIMIT 10
+		""", as_dict=True)
 
 	for run in failed_runs:
 		attempt_count = run.get("attempt_no") or 1
