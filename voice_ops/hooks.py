@@ -9,6 +9,15 @@ required_apps = ["frappe", "erpnext", "twilio_integration"]
 
 after_install = "voice_ops.setup.after_install"
 
+# Document Events
+# ----------------
+# When Twilio call ends, check if linked Checklist Run needs processing
+doc_events = {
+	"Twilio Call Log": {
+		"on_update": "voice_ops.jobs.call_log_handler.on_twilio_call_log_update",
+	},
+}
+
 # Scheduled Tasks
 # ---------------
 scheduler_events = {
