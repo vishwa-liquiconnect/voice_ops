@@ -206,23 +206,78 @@ def exotel_recording_callback():
 # Inbound driver query flow (Exotel)
 # ---------------------------------------------------------------------------
 
+from voice_ops.services.telephony import build_gather_xml
+
+# Language options mapped to DTMF digits
+_LANG_DIGITS = {
+	"1": "en-IN",
+	"2": "hi-IN",
+	"3": "ta-IN",
+	"4": "te-IN",
+	"5": "kn-IN",
+}
+
 # IVR prompts per language
 _PROMPTS = {
 	"hi-IN": {
-		"greeting": "Namaste. Liqui-Connect mein aapka swagat hai.",
+		"intro": (
+			"Dhanyavaad. Aap Liqui-Connect se jude hain. "
+			"Kripya apna naam, gaadi ka number, aur apna sawaal ya samasya bataiye. "
+			"Pehle apna naam bataiye."
+		),
 		"ask_name": "Kripya apna naam bataiye.",
-		"ask_bus": "Dhanyavaad. Ab bataiye aap kaunsi bus chala rahe hain?",
+		"ask_bus": "Dhanyavaad. Ab bataiye aap kaunsi gaadi chala rahe hain? Gaadi ka number bataiye.",
 		"ask_query": "Ab kripya apna sawaal ya samasya bataiye. Aap poori baat bol sakte hain.",
 		"goodbye": "Dhanyavaad. Aapki jaankari darj ho gayi hai. Hum jald hi sampark karenge.",
 		"no_input": "Koi jawab nahi mila.",
 	},
 	"en-IN": {
-		"greeting": "Welcome to Liqui-Connect.",
+		"intro": (
+			"Thank you. You are connected to Liqui-Connect. "
+			"Please tell us your name, vehicle number, and your query or issue. "
+			"First, please tell us your name."
+		),
 		"ask_name": "Please tell us your name.",
-		"ask_bus": "Thank you. Which bus are you driving?",
-		"ask_query": "Please describe your query or issue. You can speak as long as you need.",
+		"ask_bus": "Thank you. Which vehicle are you driving? Please tell the vehicle number.",
+		"ask_query": "Now please describe your query or issue. You can speak as long as you need.",
 		"goodbye": "Thank you. Your query has been recorded. We will get back to you soon.",
 		"no_input": "No response received.",
+	},
+	"ta-IN": {
+		"intro": (
+			"Nandri. Neenga Liqui-Connect-il inaikkappattulleergal. "
+			"Ungal peyar, vaahana number, matrum ungal kelvi allathu pirachanaiyai sollunga. "
+			"Mudhalil ungal peyarai sollunga."
+		),
+		"ask_name": "Ungal peyarai sollunga.",
+		"ask_bus": "Nandri. Neenga endha vaahanaththai ottukireergal? Vaahana number sollunga.",
+		"ask_query": "Ippoludhu ungal kelvi allathu pirachanaiyai sollunga.",
+		"goodbye": "Nandri. Ungal thagaval pathivu seyyappattathu.",
+		"no_input": "Badhil varavillai.",
+	},
+	"te-IN": {
+		"intro": (
+			"Dhanyavaadaalu. Meeru Liqui-Connect tho anubandhincharu. "
+			"Dayachesi mee peru, vaahana number, mariyu mee prasna leda samasya cheppandi. "
+			"Modatiga mee peru cheppandi."
+		),
+		"ask_name": "Dayachesi mee peru cheppandi.",
+		"ask_bus": "Dhanyavaadaalu. Meeru ee vaahanaanni naduputhunnaru? Vaahana number cheppandi.",
+		"ask_query": "Ipudu dayachesi mee prasna leda samasya cheppandi.",
+		"goodbye": "Dhanyavaadaalu. Mee samachaaramu nmodhu seyyabadindi.",
+		"no_input": "Samadhanam raledu.",
+	},
+	"kn-IN": {
+		"intro": (
+			"Dhanyavaadagalu. Neevu Liqui-Connect ge sambandha horagiddiri. "
+			"Dayavittu nimma hesaru, vaahana number, mattu nimma prashne athava samasye heli. "
+			"Modalige nimma hesaru heli."
+		),
+		"ask_name": "Dayavittu nimma hesaru heli.",
+		"ask_bus": "Dhanyavaadagalu. Neevu yaava vaahana odisuttiddiri? Vaahana number heli.",
+		"ask_query": "Iga dayavittu nimma prashne athava samasye heli.",
+		"goodbye": "Dhanyavaadagalu. Nimma mahiti dakhalaagide.",
+		"no_input": "Uttara barilla.",
 	},
 }
 
@@ -235,7 +290,7 @@ def _get_prompts(language):
 def inbound_exoml():
 	"""
 	Called when a driver calls the Exotel inbound number.
-	Creates a Driver Query doc and asks for name.
+	Creates a Driver Query doc and plays the language selection menu.
 	"""
 	try:
 		frappe.flags.ignore_permissions = True
@@ -250,8 +305,6 @@ def inbound_exoml():
 		form = frappe.request.form
 		caller_phone = form.get("CallFrom") or form.get("From") or ""
 		call_sid = form.get("CallSid") or ""
-		language = settings.inbound_greeting_language or "hi-IN"
-		prompts = _get_prompts(language)
 
 		# Create Driver Query doc
 		dq = frappe.get_doc({
@@ -264,20 +317,26 @@ def inbound_exoml():
 		dq.insert(ignore_permissions=True)
 		frappe.db.commit()
 
-		callback_url = build_callback_url(
-			"voice_ops.api.exotel_webhook.inbound_exotel_recording_callback",
-			driver_query=dq.name, step="name",
+		action_url = build_callback_url(
+			"voice_ops.api.exotel_webhook.exotel_language_callback",
+			driver_query=dq.name,
 		)
 
-		exoml = build_greeting_record_xml(
-			language=language,
-			greeting_text=prompts["greeting"],
-			question_text=prompts["ask_name"],
-			record_callback_url=callback_url,
-			timeout=5,
-			max_length=15,
-			no_input_text=prompts["no_input"],
-			redirect_url=callback_url,
+		prompt_lines = [
+			("en-IN", "Welcome to Liqui-Connect."),
+			("hi-IN", "Liqui-Connect mein aapka swagat hai."),
+			("en-IN", "Press 1 for English."),
+			("hi-IN", "Hindi ke liye 2 dabaiye."),
+			("ta-IN", "Tamil-kku 3 azhuthavum."),
+			("te-IN", "Telugu kosam 4 noppandi."),
+			("kn-IN", "Kannada ge 5 odiri."),
+		]
+
+		exoml = build_gather_xml(
+			prompt_lines=prompt_lines,
+			action_url=action_url,
+			num_digits=1,
+			timeout=10,
 		)
 
 		return Response(exoml, mimetype="text/xml")
@@ -290,9 +349,62 @@ def inbound_exoml():
 
 
 @frappe.whitelist(allow_guest=True)
+def exotel_language_callback():
+	"""
+	Called after the caller presses a digit to select language (Exotel).
+	Stores the language, explains the process, and asks for name.
+	"""
+	try:
+		frappe.flags.ignore_permissions = True
+
+		args = frappe.request.args
+		form = frappe.request.form
+
+		dq_name = args.get("driver_query")
+		digits = form.get("digits") or form.get("Digits") or ""
+
+		if not dq_name or not frappe.db.exists("Driver Query", dq_name):
+			return Response(
+				'<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
+				mimetype="text/xml",
+			)
+
+		language = _LANG_DIGITS.get(digits, "hi-IN")
+		frappe.db.set_value("Driver Query", dq_name, "selected_language", language)
+		frappe.db.commit()
+
+		prompts = _get_prompts(language)
+
+		callback_url = build_callback_url(
+			"voice_ops.api.exotel_webhook.inbound_exotel_recording_callback",
+			driver_query=dq_name, step="name",
+		)
+
+		exoml = build_greeting_record_xml(
+			language=language,
+			greeting_text=prompts["intro"],
+			question_text=prompts["ask_name"],
+			record_callback_url=callback_url,
+			timeout=5,
+			max_length=15,
+			no_input_text=prompts["no_input"],
+			redirect_url=callback_url,
+		)
+
+		return Response(exoml, mimetype="text/xml")
+
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: Exotel Language Callback Failed")
+		return Response(build_error_xml(), mimetype="text/xml")
+	finally:
+		frappe.flags.ignore_permissions = False
+
+
+@frappe.whitelist(allow_guest=True)
 def inbound_exotel_recording_callback():
 	"""
 	Steps through inbound query recording: name → bus → query.
+	Uses the caller's selected language for all prompts.
 	"""
 	try:
 		frappe.flags.ignore_permissions = True
@@ -310,9 +422,10 @@ def inbound_exotel_recording_callback():
 				mimetype="text/xml",
 			)
 
-		settings = frappe.get_single("Voice Ops Settings")
-		language = settings.inbound_greeting_language or "hi-IN"
+		language = frappe.db.get_value("Driver Query", dq_name, "selected_language") or "hi-IN"
 		prompts = _get_prompts(language)
+
+		settings = frappe.get_single("Voice Ops Settings")
 		query_max_length = settings.inbound_query_max_length or 120
 
 		# Store recording URL for current step
@@ -327,7 +440,6 @@ def inbound_exotel_recording_callback():
 				frappe.db.set_value("Driver Query", dq_name, field, recording_url)
 				frappe.db.commit()
 
-		# Determine next step
 		if step == "name":
 			callback_url = build_callback_url(
 				"voice_ops.api.exotel_webhook.inbound_exotel_recording_callback",
@@ -365,7 +477,6 @@ def inbound_exotel_recording_callback():
 			)
 
 		elif step == "query":
-			# All recordings done — enqueue processing
 			frappe.db.set_value("Driver Query", dq_name, "status", "Recording")
 			frappe.enqueue(
 				"voice_ops.jobs.process_driver_query.process",

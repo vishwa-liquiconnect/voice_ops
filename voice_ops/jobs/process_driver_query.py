@@ -31,7 +31,8 @@ def process(driver_query_name):
 		frappe.db.commit()
 
 		# Step 1-2: Download and transcribe recordings
-		detected_language = None
+		# Use caller's DTMF-selected language as a hint (Sarvam still auto-detects)
+		detected_language = dq.selected_language or None
 
 		for field_prefix, recording_field, transcript_field in [
 			("name", "name_recording_url", "name_transcript"),

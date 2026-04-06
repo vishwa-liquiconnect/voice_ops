@@ -14,6 +14,7 @@
 		"verbal_name",
 		"verbal_bus",
 		"vehicle",
+		"selected_language",
 		"call_section",
 		"call_sid",
 		"status",
@@ -93,6 +94,15 @@
 			"label": "Vehicle",
 			"options": "Vehicle",
 			"read_only": 1
+		},
+		{
+			"fieldname": "selected_language",
+			"fieldtype": "Select",
+			"label": "Selected Language",
+			"options": "\nhi-IN\nen-IN\nta-IN\nte-IN\nkn-IN",
+			"read_only": 1,
+			"in_list_view": 1,
+			"description": "Language chosen by the caller via DTMF"
 		},
 		{
 			"fieldname": "call_section",

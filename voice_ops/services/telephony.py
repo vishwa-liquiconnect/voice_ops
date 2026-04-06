@@ -172,6 +172,46 @@ def _get_exotel_status_callback_url():
 # XML response builders
 # ---------------------------------------------------------------------------
 
+def build_gather_xml(prompt_lines, action_url, num_digits=1, timeout=10):
+	"""
+	Build provider-specific XML for DTMF digit collection.
+
+	Args:
+		prompt_lines: List of (language, text) tuples to say inside the Gather
+		action_url: URL to POST the collected digits to
+		num_digits: Number of digits to collect
+		timeout: Seconds to wait for input
+	"""
+	provider = get_provider()
+	if provider == "Exotel":
+		return _build_exoml_gather(prompt_lines, action_url, num_digits, timeout)
+	return _build_twiml_gather(prompt_lines, action_url, num_digits, timeout)
+
+
+def _build_twiml_gather(prompt_lines, action_url, num_digits, timeout):
+	say_tags = "\n\t\t".join(
+		f'<Say language="{lang}">{text}</Say>' for lang, text in prompt_lines
+	)
+	return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+\t<Gather action="{action_url}" numDigits="{num_digits}" timeout="{timeout}">
+\t\t{say_tags}
+\t</Gather>
+\t<Redirect>{action_url}</Redirect>
+</Response>"""
+
+
+def _build_exoml_gather(prompt_lines, action_url, num_digits, timeout):
+	say_tags = "\n\t\t".join(f'<Say>{text}</Say>' for _, text in prompt_lines)
+	return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+\t<Gather action="{action_url}" numDigits="{num_digits}" timeout="{timeout}">
+\t\t{say_tags}
+\t</Gather>
+\t<Redirect>{action_url}</Redirect>
+</Response>"""
+
+
 def build_say_record_xml(language, say_text, record_callback_url,
                          status_callback_url=None, timeout=5, max_length=30,
                          no_input_text=None, redirect_url=None):
