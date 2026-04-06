@@ -24,7 +24,7 @@ def initiate_call(to_number, reference_doctype=None, reference_name=None):
 		Call log document name
 	"""
 	site_url = get_url()
-	provider = frappe.db.get_single_value("Voice Ops Settings", "telephony_provider") or "Twilio"
+	provider = frappe.db.get_single_value("Voice Ops Settings", "outbound_telephony_provider") or "Twilio"
 
 	if provider == "Exotel":
 		endpoint = "voice_ops.api.exotel_webhook.exoml_response"
@@ -39,4 +39,5 @@ def initiate_call(to_number, reference_doctype=None, reference_name=None):
 		twiml_url=callback_url,
 		reference_doctype=reference_doctype,
 		reference_name=reference_name,
+		flow="outbound",
 	)

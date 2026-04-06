@@ -19,7 +19,7 @@ from frappe.utils import now_datetime, today, getdate
 from voice_ops.services.query_notification import notify_query
 from voice_ops.services.sarvam import transcribe_bytes
 from voice_ops.services.summarizer import summarize_query
-from voice_ops.services.telephony import download_recording
+from voice_ops.services.telephony import download_recording as _download_recording
 
 
 def process(driver_query_name):
@@ -119,7 +119,7 @@ def process(driver_query_name):
 
 def _transcribe_recording(recording_url, prefix):
 	"""Download and transcribe a single recording via Sarvam."""
-	audio_bytes = download_recording(recording_url)
+	audio_bytes = _download_recording(recording_url, flow="inbound")
 	if not audio_bytes or len(audio_bytes) < 100:
 		return "", None
 

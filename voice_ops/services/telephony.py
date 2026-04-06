@@ -4,7 +4,9 @@ Telephony Provider Abstraction
 Provides a unified interface for Twilio and Exotel telephony operations:
 call initiation, XML response building, recording download, and call log management.
 
-The active provider is configured in Voice Ops Settings (telephony_provider field).
+Providers are configured independently per flow in Voice Ops Settings:
+- outbound_telephony_provider: for checklist calls to drivers
+- inbound_telephony_provider: for driver query calls
 """
 
 import frappe
@@ -16,14 +18,24 @@ from frappe.utils import get_url
 # Provider detection
 # ---------------------------------------------------------------------------
 
-def get_provider():
-	"""Return the configured telephony provider ('Twilio' or 'Exotel')."""
-	return frappe.db.get_single_value("Voice Ops Settings", "telephony_provider") or "Twilio"
+def get_provider(flow="outbound"):
+	"""
+	Return the configured telephony provider for a given flow.
+
+	Args:
+		flow: 'outbound' (checklist calls) or 'inbound' (driver queries)
+
+	Returns:
+		'Twilio' or 'Exotel'
+	"""
+	if flow == "inbound":
+		return frappe.db.get_single_value("Voice Ops Settings", "inbound_telephony_provider") or "Twilio"
+	return frappe.db.get_single_value("Voice Ops Settings", "outbound_telephony_provider") or "Twilio"
 
 
-def get_call_log_doctype():
-	"""Return the Call Log doctype name for the active provider."""
-	if get_provider() == "Exotel":
+def get_call_log_doctype(flow="outbound"):
+	"""Return the Call Log doctype name for the given flow's provider."""
+	if get_provider(flow) == "Exotel":
 		return "Call Log"
 	return "Twilio Call Log"
 
@@ -55,20 +67,21 @@ def build_callback_url(endpoint, **params):
 # Call initiation
 # ---------------------------------------------------------------------------
 
-def initiate_call(to_number, twiml_url, reference_doctype=None, reference_name=None):
+def initiate_call(to_number, twiml_url, reference_doctype=None, reference_name=None, flow="outbound"):
 	"""
-	Initiate an outbound call via the configured provider.
+	Initiate an outbound call via the configured provider for the given flow.
 
 	Args:
 		to_number: Recipient phone number
 		twiml_url: URL the provider should fetch for call flow instructions
 		reference_doctype: DocType to link in call log
 		reference_name: Document name to link
+		flow: 'outbound' or 'inbound'
 
 	Returns:
 		Call log document name (str)
 	"""
-	provider = get_provider()
+	provider = get_provider(flow)
 	if provider == "Exotel":
 		return _initiate_exotel_call(to_number, twiml_url, reference_doctype, reference_name)
 	return _initiate_twilio_call(to_number, twiml_url, reference_doctype, reference_name)
@@ -172,7 +185,7 @@ def _get_exotel_status_callback_url():
 # XML response builders
 # ---------------------------------------------------------------------------
 
-def build_gather_xml(prompt_lines, action_url, num_digits=1, timeout=10):
+def build_gather_xml(prompt_lines, action_url, num_digits=1, timeout=10, provider=None):
 	"""
 	Build provider-specific XML for DTMF digit collection.
 
@@ -181,8 +194,8 @@ def build_gather_xml(prompt_lines, action_url, num_digits=1, timeout=10):
 		action_url: URL to POST the collected digits to
 		num_digits: Number of digits to collect
 		timeout: Seconds to wait for input
+		provider: 'Twilio' or 'Exotel' (explicit; avoids ambiguity with per-flow settings)
 	"""
-	provider = get_provider()
 	if provider == "Exotel":
 		return _build_exoml_gather(prompt_lines, action_url, num_digits, timeout)
 	return _build_twiml_gather(prompt_lines, action_url, num_digits, timeout)
@@ -214,14 +227,17 @@ def _build_exoml_gather(prompt_lines, action_url, num_digits, timeout):
 
 def build_say_record_xml(language, say_text, record_callback_url,
                          status_callback_url=None, timeout=5, max_length=30,
-                         no_input_text=None, redirect_url=None):
+                         no_input_text=None, redirect_url=None, provider=None):
 	"""
 	Build provider-specific XML for a say-then-record pattern.
 
 	Returns XML string. The redirect_url defaults to record_callback_url
 	(handles the case where caller doesn't speak and Record times out).
+
+	Args:
+		provider: 'Twilio' or 'Exotel' (explicit; avoids ambiguity with per-flow settings)
 	"""
-	provider = get_provider()
+	provider = provider or "Twilio"
 	redirect = redirect_url or record_callback_url
 	no_input = no_input_text or ""
 
@@ -268,9 +284,9 @@ def _build_exoml_say_record(say_text, callback_url, timeout, max_length,
 </Response>"""
 
 
-def build_goodbye_xml(language, goodbye_text):
+def build_goodbye_xml(language, goodbye_text, provider=None):
 	"""Build provider-specific XML for goodbye + hangup."""
-	provider = get_provider()
+	provider = provider or "Twilio"
 	if provider == "Exotel":
 		return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -288,11 +304,11 @@ def build_goodbye_xml(language, goodbye_text):
 def build_greeting_record_xml(language, greeting_text, question_text,
                                record_callback_url, status_callback_url=None,
                                timeout=5, max_length=30,
-                               no_input_text=None, redirect_url=None):
+                               no_input_text=None, redirect_url=None, provider=None):
 	"""
 	Build XML for greeting + pause + question + record (used for first question).
 	"""
-	provider = get_provider()
+	provider = provider or "Twilio"
 	redirect = redirect_url or record_callback_url
 	no_input = no_input_text or ""
 
@@ -322,9 +338,9 @@ def build_greeting_record_xml(language, greeting_text, question_text,
 </Response>"""
 
 
-def build_error_xml():
+def build_error_xml(provider=None):
 	"""Build provider-specific error XML."""
-	provider = get_provider()
+	provider = provider or "Twilio"
 	if provider == "Exotel":
 		return '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Something went wrong. Please try again later.</Say><Hangup/></Response>'
 	return '<?xml version="1.0" encoding="UTF-8"?><Response><Say language="hi-IN">Kuch galat ho gaya. Kripya baad mein try karein.</Say><Hangup/></Response>'
@@ -334,13 +350,17 @@ def build_error_xml():
 # Recording download
 # ---------------------------------------------------------------------------
 
-def download_recording(recording_url):
+def download_recording(recording_url, flow="outbound"):
 	"""
 	Download a call recording with provider-appropriate auth.
 
+	Args:
+		recording_url: URL to download from
+		flow: 'outbound' or 'inbound' (determines auth method based on provider)
+
 	Returns audio bytes, or None on failure.
 	"""
-	provider = get_provider()
+	provider = get_provider(flow)
 
 	if provider == "Exotel":
 		return _download_exotel_recording(recording_url)
@@ -402,13 +422,13 @@ def _download_exotel_recording(recording_url):
 # Recording attachment
 # ---------------------------------------------------------------------------
 
-def download_and_attach_recording(call_log_name, recording_url, audio_bytes=None):
+def download_and_attach_recording(call_log_name, recording_url, audio_bytes=None, flow="outbound"):
 	"""
 	Attach recording as a File to the call log document.
 
 	Works with both Twilio Call Log and Call Log doctypes.
 	"""
-	audio_content = audio_bytes or download_recording(recording_url)
+	audio_content = audio_bytes or download_recording(recording_url, flow=flow)
 	if not audio_content:
 		return None
 
@@ -416,7 +436,7 @@ def download_and_attach_recording(call_log_name, recording_url, audio_bytes=None
 	if ".wav" in recording_url:
 		ext = ".wav"
 
-	call_log_dt = get_call_log_doctype()
+	call_log_dt = get_call_log_doctype(flow)
 	file_name = f"call_recording_{call_log_name}{ext}"
 
 	file_doc = frappe.get_doc({

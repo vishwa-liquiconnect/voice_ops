@@ -79,7 +79,7 @@ def exoml_response():
 		template, questions = _get_template_and_questions(checklist_run)
 
 		if not questions:
-			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad."), mimetype="text/xml")
+			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad.", provider="Exotel"), mimetype="text/xml")
 
 		language = _get_language(checklist_run)
 		call_settings = _get_call_settings()
@@ -105,13 +105,14 @@ def exoml_response():
 			max_length=max_length,
 			no_input_text="Koi jawab nahi mila." if language == "hi-IN" else "No response received.",
 			redirect_url=callback_url,
+			provider="Exotel",
 		)
 
 		return Response(exoml, mimetype="text/xml")
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: ExoML Response Failed")
-		return Response(build_error_xml(), mimetype="text/xml")
+		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
 
@@ -169,6 +170,7 @@ def exotel_recording_callback():
 				max_length=max_length,
 				no_input_text="Koi jawab nahi mila. Agla sawaal." if language == "hi-IN" else "No response. Next question.",
 				redirect_url=next_callback_url,
+				provider="Exotel",
 			)
 			return Response(exoml, mimetype="text/xml")
 
@@ -191,13 +193,13 @@ def exotel_recording_callback():
 		frappe.db.commit()
 
 		return Response(
-			build_goodbye_xml(language, template.outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai."),
+			build_goodbye_xml(language, template.outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai.", provider="Exotel"),
 			mimetype="text/xml",
 		)
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Exotel Recording Callback Failed")
-		return Response(build_error_xml(), mimetype="text/xml")
+		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
 
@@ -298,7 +300,7 @@ def inbound_exoml():
 		settings = frappe.get_single("Voice Ops Settings")
 		if not settings.enable_inbound_calls:
 			return Response(
-				build_goodbye_xml("hi-IN", "Yeh seva abhi uplabdh nahi hai. Dhanyavaad."),
+				build_goodbye_xml("hi-IN", "Yeh seva abhi uplabdh nahi hai. Dhanyavaad.", provider="Exotel"),
 				mimetype="text/xml",
 			)
 
@@ -337,13 +339,14 @@ def inbound_exoml():
 			action_url=action_url,
 			num_digits=1,
 			timeout=10,
+			provider="Exotel",
 		)
 
 		return Response(exoml, mimetype="text/xml")
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Inbound ExoML Failed")
-		return Response(build_error_xml(), mimetype="text/xml")
+		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
 
@@ -389,13 +392,14 @@ def exotel_language_callback():
 			max_length=15,
 			no_input_text=prompts["no_input"],
 			redirect_url=callback_url,
+			provider="Exotel",
 		)
 
 		return Response(exoml, mimetype="text/xml")
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Exotel Language Callback Failed")
-		return Response(build_error_xml(), mimetype="text/xml")
+		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
 
@@ -454,6 +458,7 @@ def inbound_exotel_recording_callback():
 					max_length=15,
 					no_input_text=prompts["no_input"],
 					redirect_url=callback_url,
+					provider="Exotel",
 				),
 				mimetype="text/xml",
 			)
@@ -472,6 +477,7 @@ def inbound_exotel_recording_callback():
 					max_length=query_max_length,
 					no_input_text=prompts["no_input"],
 					redirect_url=callback_url,
+					provider="Exotel",
 				),
 				mimetype="text/xml",
 			)
@@ -486,7 +492,7 @@ def inbound_exotel_recording_callback():
 			frappe.db.commit()
 
 			return Response(
-				build_goodbye_xml(language, prompts["goodbye"]),
+				build_goodbye_xml(language, prompts["goodbye"], provider="Exotel"),
 				mimetype="text/xml",
 			)
 
@@ -497,6 +503,6 @@ def inbound_exotel_recording_callback():
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Inbound Exotel Recording Callback Failed")
-		return Response(build_error_xml(), mimetype="text/xml")
+		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False

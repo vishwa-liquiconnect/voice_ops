@@ -27,7 +27,7 @@ def process_pending_retries():
 	max_attempts = settings.max_call_attempts or 3
 
 	# Query differs by provider due to different call log doctypes
-	provider = get_provider()
+	provider = get_provider("outbound")
 	if provider == "Exotel":
 		failed_runs = frappe.db.sql("""
 			SELECT

@@ -34,26 +34,26 @@ def notify_query(driver_query_name):
 	errors = []
 
 	# --- Notify MD ---
-	md_phone = settings.md_phone
-	md_email = settings.md_email
+	reporter_phone = settings.reporter_phone
+	reporter_email = settings.reporter_email
 
-	if md_phone and settings.enable_whatsapp_notifications:
+	if reporter_phone and settings.enable_whatsapp_notifications:
 		try:
-			_send_whatsapp_notification(md_phone, caller_display, bus_display, summary, dq, dq_url)
+			_send_whatsapp_notification(reporter_phone, caller_display, bus_display, summary, dq, dq_url)
 			dq.md_notified = 1
 		except Exception as e:
-			errors.append(f"MD WhatsApp: {e}")
+			errors.append(f"Reporter WhatsApp: {e}")
 
-	if md_email and settings.enable_email_notifications:
+	if reporter_email and settings.enable_email_notifications:
 		try:
 			_send_email_notification(
-				[md_email], caller_display, bus_display, summary, dq, dq_url
+				[reporter_email], caller_display, bus_display, summary, dq, dq_url
 			)
 			dq.md_notified = 1
 		except Exception as e:
-			errors.append(f"MD Email: {e}")
+			errors.append(f"Reporter Email: {e}")
 
-	# In-app notification for MD (if they have a User account)
+	# In-app notification for Reporter (if they have a User account)
 	_create_in_app_notification(dq, caller_display, summary, role="System Manager")
 
 	# --- Notify Route Manager ---

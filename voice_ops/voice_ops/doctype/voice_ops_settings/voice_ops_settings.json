@@ -7,7 +7,10 @@
 	"description": "Configuration for Voice Ops integrations and call settings",
 	"field_order": [
 		"enabled",
-		"telephony_provider",
+		"provider_section",
+		"outbound_telephony_provider",
+		"column_break_provider",
+		"inbound_telephony_provider",
 		"trigger_section",
 		"call_buffer_minutes",
 		"default_checklist_template",
@@ -45,8 +48,8 @@
 		"twilio_whatsapp_number",
 		"column_break_notification",
 		"enable_email_notifications",
-		"md_phone",
-		"md_email",
+		"reporter_phone",
+		"reporter_email",
 		"ai_section",
 		"anthropic_api_key"
 	],
@@ -56,16 +59,34 @@
 			"fieldtype": "Check",
 			"label": "Enabled",
 			"default": "0",
-			"description": "Configure credentials in Twilio Settings or Exotel Settings based on selected provider"
+			"description": "Configure credentials in Twilio Settings or Exotel Settings based on selected providers"
 		},
 		{
-			"fieldname": "telephony_provider",
+			"fieldname": "provider_section",
+			"fieldtype": "Section Break",
+			"label": "Telephony Providers",
+			"depends_on": "eval:doc.enabled",
+			"description": "Configure providers independently for outbound (checklist calls to drivers) and inbound (driver query calls)"
+		},
+		{
+			"fieldname": "outbound_telephony_provider",
 			"fieldtype": "Select",
-			"label": "Telephony Provider",
+			"label": "Outbound Provider",
 			"options": "Twilio\nExotel",
 			"default": "Twilio",
-			"depends_on": "eval:doc.enabled",
-			"description": "Select the telephony provider for call handling"
+			"description": "Provider for outbound checklist calls (pre-departure, post-trip)"
+		},
+		{
+			"fieldname": "column_break_provider",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "inbound_telephony_provider",
+			"fieldtype": "Select",
+			"label": "Inbound Provider",
+			"options": "Twilio\nExotel",
+			"default": "Twilio",
+			"description": "Provider for inbound driver query calls"
 		},
 		{
 			"fieldname": "trigger_section",
@@ -259,7 +280,7 @@
 			"options": "hi-IN\nen-IN\nta-IN\nte-IN\nkn-IN",
 			"default": "hi-IN",
 			"depends_on": "eval:doc.enable_inbound_calls",
-			"description": "Language for IVR prompts during inbound calls"
+			"description": "Fallback language for IVR prompts (callers choose via DTMF)"
 		},
 		{
 			"fieldname": "column_break_inbound",
@@ -305,17 +326,17 @@
 			"description": "Send query notifications via email"
 		},
 		{
-			"fieldname": "md_phone",
+			"fieldname": "reporter_phone",
 			"fieldtype": "Data",
-			"label": "MD Phone (WhatsApp)",
-			"description": "Managing Director's phone number with country code (e.g. +919876543210)"
+			"label": "Reporter Phone (WhatsApp)",
+			"description": "Reporter's phone number with country code for WhatsApp notifications (e.g. +919876543210)"
 		},
 		{
-			"fieldname": "md_email",
+			"fieldname": "reporter_email",
 			"fieldtype": "Data",
-			"label": "MD Email",
+			"label": "Reporter Email",
 			"options": "Email",
-			"description": "Managing Director's email address for notifications"
+			"description": "Reporter's email address for query notifications"
 		},
 		{
 			"fieldname": "ai_section",
