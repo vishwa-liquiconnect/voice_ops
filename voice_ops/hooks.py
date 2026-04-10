@@ -9,6 +9,12 @@ required_apps = ["frappe", "erpnext"]
 
 after_install = "voice_ops.setup.after_install"
 
+# Doctype JS
+# ----------
+doctype_js = {
+	"Call Log": "public/js/call_log.js",
+}
+
 # Document Events
 # ----------------
 # Detect call completion and trigger processing for linked Checklist Runs
