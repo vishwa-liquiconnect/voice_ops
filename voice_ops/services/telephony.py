@@ -398,12 +398,19 @@ def _download_twilio_recording(recording_url):
 
 
 def _download_exotel_recording(recording_url):
-	"""Download from Exotel with API credentials (basic auth)."""
+	"""Download from Exotel via the API endpoint with credentials."""
 	auth = None
 	if "exotel.com" in recording_url:
 		from requests.auth import HTTPBasicAuth
 		settings = frappe.get_single("Exotel Settings")
 		auth = HTTPBasicAuth(settings.api_key, settings.get_password("api_token"))
+
+		# Rewrite recordings.exotel.com URLs to go through the API
+		# e.g. https://recordings.exotel.com/exotelrecordings/tenant/file.mp3
+		#   -> https://api.exotel.com/v1/Accounts/{sid}/Recordings/file.mp3
+		if "recordings.exotel.com" in recording_url:
+			filename = recording_url.rsplit("/", 1)[-1]
+			recording_url = f"https://api.exotel.com/v1/Accounts/{settings.account_sid}/Recordings/{filename}"
 
 	for attempt in range(3):
 		try:
