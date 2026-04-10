@@ -34,9 +34,15 @@ def on_twilio_call_log_update(doc, method):
 
 
 def fix_exotel_null_status(doc, method):
-	"""Fix Exotel sending the string 'null' as DialCallStatus for voicemail calls."""
+	"""Fix Exotel sending the string 'null' as DialCallStatus for voicemail calls.
+	Also capture recording URL from the webhook payload since exotel_integration
+	only sets it during update_call_log, not create_call_log.
+	"""
 	if doc.status == "null":
 		doc.status = "No Answer"
+
+	if not doc.recording_url and frappe.form_dict.get("RecordingUrl"):
+		doc.recording_url = frappe.form_dict.get("RecordingUrl")
 
 
 def on_exotel_call_log_update(doc, method):
