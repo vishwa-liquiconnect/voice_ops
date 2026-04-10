@@ -63,9 +63,11 @@ def attach_exotel_recording(doc, method):
 
 
 def _download_and_attach_exotel_recording(call_log_name, recording_url):
-	from voice_ops.services.telephony import download_and_attach_recording
+	from voice_ops.services.telephony import _download_exotel_recording, download_and_attach_recording
 
-	download_and_attach_recording(call_log_name, recording_url, flow="outbound")
+	audio = _download_exotel_recording(recording_url)
+	if audio:
+		download_and_attach_recording(call_log_name, recording_url, audio_bytes=audio)
 
 
 def on_exotel_call_log_update(doc, method):
