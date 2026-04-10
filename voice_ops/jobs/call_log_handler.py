@@ -33,6 +33,12 @@ def on_twilio_call_log_update(doc, method):
 	_handle_call_completion(doc.reference_name, doc.name)
 
 
+def fix_exotel_null_status(doc, method):
+	"""Fix Exotel sending the string 'null' as DialCallStatus for voicemail calls."""
+	if doc.status == "null":
+		doc.status = "No Answer"
+
+
 def on_exotel_call_log_update(doc, method):
 	"""
 	Called on Call Log (Exotel) on_update (via doc_events hook).

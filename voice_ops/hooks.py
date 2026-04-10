@@ -17,6 +17,7 @@ doc_events = {
 		"on_update": "voice_ops.jobs.call_log_handler.on_twilio_call_log_update",
 	},
 	"Call Log": {
+		"before_validate": "voice_ops.jobs.call_log_handler.fix_exotel_null_status",
 		"on_update": "voice_ops.jobs.call_log_handler.on_exotel_call_log_update",
 	},
 }
