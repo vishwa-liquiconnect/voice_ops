@@ -125,13 +125,14 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 
 	callback_url = force_https(callback_url)
 	exophone = _get_exophone()
+	caller_id = frappe.db.get_single_value("Voice Ops Settings", "exotel_caller_id") or exophone
 
 	response = requests.post(
 		endpoint,
 		data={
 			"From": exophone,
 			"To": to_number,
-			"CallerId": exophone,
+			"CallerId": caller_id,
 			"Url": callback_url,
 			"Record": "true",
 			"StatusCallback": _get_exotel_status_callback_url(),
@@ -163,13 +164,11 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 
 
 def _get_exophone():
-	"""Get the first available Exotel phone number."""
-	from exotel_integration.handler import get_all_exophones
-
-	phones = get_all_exophones()
-	if not phones:
-		frappe.throw("No Exotel phone numbers (exophones) configured.")
-	return phones[0]
+	"""Get the Exotel exophone from Voice Ops Settings."""
+	exophone = frappe.db.get_single_value("Voice Ops Settings", "exotel_exophone")
+	if not exophone:
+		frappe.throw("No Exotel exophone configured in Voice Ops Settings.")
+	return exophone
 
 
 def _get_exotel_status_callback_url():

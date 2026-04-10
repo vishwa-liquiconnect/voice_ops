@@ -13,6 +13,10 @@
 		"outbound_telephony_provider",
 		"column_break_provider",
 		"inbound_telephony_provider",
+		"exotel_section",
+		"exotel_exophone",
+		"column_break_exotel",
+		"exotel_caller_id",
 
 		"tab_call_settings",
 		"trigger_section",
@@ -112,6 +116,28 @@
 			"options": "Twilio\nExotel",
 			"default": "Twilio",
 			"description": "Provider for inbound driver query calls"
+		},
+		{
+			"fieldname": "exotel_section",
+			"fieldtype": "Section Break",
+			"label": "Exotel Phone Numbers",
+			"depends_on": "eval:doc.outbound_telephony_provider == 'Exotel' || doc.inbound_telephony_provider == 'Exotel'"
+		},
+		{
+			"fieldname": "exotel_exophone",
+			"fieldtype": "Data",
+			"label": "Exophone (Virtual Number)",
+			"description": "Exotel virtual number used for outbound calls (e.g. 08037091588)"
+		},
+		{
+			"fieldname": "column_break_exotel",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "exotel_caller_id",
+			"fieldtype": "Data",
+			"label": "Caller ID",
+			"description": "Caller ID shown to the recipient. Usually same as exophone."
 		},
 		{
 			"fieldname": "tab_call_settings",
