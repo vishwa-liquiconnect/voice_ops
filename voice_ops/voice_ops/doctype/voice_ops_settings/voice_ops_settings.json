@@ -50,6 +50,14 @@
 		"enable_email_notifications",
 		"reporter_phone",
 		"reporter_email",
+		"voicemail_digest_section",
+		"enable_voicemail_digest",
+		"voicemail_digest_time",
+		"column_break_voicemail_digest",
+		"voicemail_digest_channel",
+		"voicemail_digest_email",
+		"voicemail_digest_phone",
+		"last_voicemail_digest_sent",
 		"ai_section",
 		"anthropic_api_key"
 	],
@@ -337,6 +345,63 @@
 			"label": "Reporter Email",
 			"options": "Email",
 			"description": "Reporter's email address for query notifications"
+		},
+		{
+			"fieldname": "voicemail_digest_section",
+			"fieldtype": "Section Break",
+			"label": "Voicemail Digest",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "enable_voicemail_digest",
+			"fieldtype": "Check",
+			"label": "Enable Voicemail Digest",
+			"default": "0",
+			"description": "Send a daily digest of all voicemails received"
+		},
+		{
+			"fieldname": "voicemail_digest_time",
+			"fieldtype": "Select",
+			"label": "Digest Time",
+			"options": "06:00\n07:00\n08:00\n09:00\n10:00\n11:00\n12:00\n13:00\n14:00\n15:00\n16:00\n17:00\n18:00\n19:00\n20:00",
+			"default": "10:00",
+			"depends_on": "eval:doc.enable_voicemail_digest",
+			"description": "Time of day to send the voicemail digest (server timezone)"
+		},
+		{
+			"fieldname": "column_break_voicemail_digest",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "voicemail_digest_channel",
+			"fieldtype": "Select",
+			"label": "Digest Channel",
+			"options": "Email\nWhatsApp\nBoth",
+			"default": "Email",
+			"depends_on": "eval:doc.enable_voicemail_digest",
+			"description": "Notification channel for the voicemail digest"
+		},
+		{
+			"fieldname": "voicemail_digest_email",
+			"fieldtype": "Data",
+			"label": "Digest Email Recipients",
+			"options": "Email",
+			"depends_on": "eval:doc.enable_voicemail_digest && (doc.voicemail_digest_channel == 'Email' || doc.voicemail_digest_channel == 'Both')",
+			"description": "Comma-separated email addresses for voicemail digest"
+		},
+		{
+			"fieldname": "voicemail_digest_phone",
+			"fieldtype": "Data",
+			"label": "Digest WhatsApp Recipients",
+			"depends_on": "eval:doc.enable_voicemail_digest && (doc.voicemail_digest_channel == 'WhatsApp' || doc.voicemail_digest_channel == 'Both')",
+			"description": "Comma-separated phone numbers with country code (e.g. +919876543210)"
+		},
+		{
+			"fieldname": "last_voicemail_digest_sent",
+			"fieldtype": "Datetime",
+			"label": "Last Digest Sent",
+			"read_only": 1,
+			"hidden": 1
 		},
 		{
 			"fieldname": "ai_section",
