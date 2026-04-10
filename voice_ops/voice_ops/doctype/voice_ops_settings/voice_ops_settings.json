@@ -7,10 +7,14 @@
 	"description": "Configuration for Voice Ops integrations and call settings",
 	"field_order": [
 		"enabled",
+
+		"tab_general",
 		"provider_section",
 		"outbound_telephony_provider",
 		"column_break_provider",
 		"inbound_telephony_provider",
+
+		"tab_call_settings",
 		"trigger_section",
 		"call_buffer_minutes",
 		"default_checklist_template",
@@ -23,6 +27,15 @@
 		"post_trip_checklist_template",
 		"column_break_post_trip",
 		"post_trip_buffer_minutes",
+
+		"tab_inbound",
+		"inbound_section",
+		"enable_inbound_calls",
+		"inbound_greeting_language",
+		"column_break_inbound",
+		"inbound_query_max_length",
+
+		"tab_integrations",
 		"sarvam_section",
 		"sarvam_api_key",
 		"column_break_sarvam",
@@ -30,6 +43,10 @@
 		"sarvam_model",
 		"sarvam_mode",
 		"sarvam_language_code",
+		"ai_section",
+		"anthropic_api_key",
+
+		"tab_rules",
 		"evaluation_section",
 		"low_confidence_threshold",
 		"escalation_section",
@@ -38,11 +55,8 @@
 		"escalation_email_group",
 		"synonym_section",
 		"synonyms",
-		"inbound_section",
-		"enable_inbound_calls",
-		"inbound_greeting_language",
-		"column_break_inbound",
-		"inbound_query_max_length",
+
+		"tab_notifications",
 		"notification_section",
 		"enable_whatsapp_notifications",
 		"twilio_whatsapp_number",
@@ -57,9 +71,7 @@
 		"voicemail_digest_channel",
 		"voicemail_digest_email",
 		"voicemail_digest_phone",
-		"last_voicemail_digest_sent",
-		"ai_section",
-		"anthropic_api_key"
+		"last_voicemail_digest_sent"
 	],
 	"fields": [
 		{
@@ -70,10 +82,15 @@
 			"description": "Configure credentials in Twilio Settings or Exotel Settings based on selected providers"
 		},
 		{
+			"fieldname": "tab_general",
+			"fieldtype": "Tab Break",
+			"label": "General",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
 			"fieldname": "provider_section",
 			"fieldtype": "Section Break",
 			"label": "Telephony Providers",
-			"depends_on": "eval:doc.enabled",
 			"description": "Configure providers independently for outbound (checklist calls to drivers) and inbound (driver query calls)"
 		},
 		{
@@ -97,10 +114,15 @@
 			"description": "Provider for inbound driver query calls"
 		},
 		{
+			"fieldname": "tab_call_settings",
+			"fieldtype": "Tab Break",
+			"label": "Call Settings",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
 			"fieldname": "trigger_section",
 			"fieldtype": "Section Break",
-			"label": "Pre-Departure Call Settings",
-			"depends_on": "eval:doc.enabled"
+			"label": "Pre-Departure"
 		},
 		{
 			"fieldname": "call_buffer_minutes",
@@ -150,8 +172,7 @@
 		{
 			"fieldname": "post_trip_section",
 			"fieldtype": "Section Break",
-			"label": "Post-Trip Call Settings",
-			"depends_on": "eval:doc.enabled"
+			"label": "Post-Trip"
 		},
 		{
 			"fieldname": "post_trip_checklist_template",
@@ -172,10 +193,54 @@
 			"description": "How many minutes after trip completion to allow triggering the post-trip call"
 		},
 		{
+			"fieldname": "tab_inbound",
+			"fieldtype": "Tab Break",
+			"label": "Inbound Calls",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "inbound_section",
+			"fieldtype": "Section Break",
+			"label": "Inbound Call Settings"
+		},
+		{
+			"fieldname": "enable_inbound_calls",
+			"fieldtype": "Check",
+			"label": "Enable Inbound Calls",
+			"default": "0",
+			"description": "Allow drivers to call in with queries. Configure the inbound number in your telephony provider's dashboard."
+		},
+		{
+			"fieldname": "inbound_greeting_language",
+			"fieldtype": "Select",
+			"label": "Inbound Greeting Language",
+			"options": "hi-IN\nen-IN\nta-IN\nte-IN\nkn-IN",
+			"default": "hi-IN",
+			"depends_on": "eval:doc.enable_inbound_calls",
+			"description": "Fallback language for IVR prompts (callers choose via DTMF)"
+		},
+		{
+			"fieldname": "column_break_inbound",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "inbound_query_max_length",
+			"fieldtype": "Int",
+			"label": "Max Query Recording (seconds)",
+			"default": "120",
+			"depends_on": "eval:doc.enable_inbound_calls",
+			"description": "Maximum duration for the driver's free-speech query recording"
+		},
+		{
+			"fieldname": "tab_integrations",
+			"fieldtype": "Tab Break",
+			"label": "Integrations",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
 			"fieldname": "sarvam_section",
 			"fieldtype": "Section Break",
-			"label": "Sarvam AI Integration",
-			"depends_on": "eval:doc.enabled"
+			"label": "Sarvam AI"
 		},
 		{
 			"fieldname": "sarvam_api_key",
@@ -218,10 +283,26 @@
 			"description": "Set to 'unknown' for auto-detection (recommended with saaras:v3)"
 		},
 		{
+			"fieldname": "ai_section",
+			"fieldtype": "Section Break",
+			"label": "Anthropic AI"
+		},
+		{
+			"fieldname": "anthropic_api_key",
+			"fieldtype": "Password",
+			"label": "Anthropic API Key",
+			"description": "API key for Claude-based query summarization"
+		},
+		{
+			"fieldname": "tab_rules",
+			"fieldtype": "Tab Break",
+			"label": "Rules & Evaluation",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
 			"fieldname": "evaluation_section",
 			"fieldtype": "Section Break",
-			"label": "Evaluation Settings",
-			"depends_on": "eval:doc.enabled"
+			"label": "Evaluation"
 		},
 		{
 			"fieldname": "low_confidence_threshold",
@@ -233,8 +314,7 @@
 		{
 			"fieldname": "escalation_section",
 			"fieldtype": "Section Break",
-			"label": "Escalation Settings",
-			"depends_on": "eval:doc.enabled"
+			"label": "Escalation"
 		},
 		{
 			"fieldname": "enable_escalation",
@@ -259,7 +339,6 @@
 			"fieldname": "synonym_section",
 			"fieldtype": "Section Break",
 			"label": "Yes/No Synonyms",
-			"depends_on": "eval:doc.enabled",
 			"description": "Add language-specific words that mean Yes or No. These are merged with built-in defaults."
 		},
 		{
@@ -269,44 +348,15 @@
 			"options": "Voice Ops Synonym"
 		},
 		{
-			"fieldname": "inbound_section",
-			"fieldtype": "Section Break",
-			"label": "Inbound Call Settings",
+			"fieldname": "tab_notifications",
+			"fieldtype": "Tab Break",
+			"label": "Notifications",
 			"depends_on": "eval:doc.enabled"
-		},
-		{
-			"fieldname": "enable_inbound_calls",
-			"fieldtype": "Check",
-			"label": "Enable Inbound Calls",
-			"default": "0",
-			"description": "Allow drivers to call in with queries. Configure the inbound number in your telephony provider's dashboard."
-		},
-		{
-			"fieldname": "inbound_greeting_language",
-			"fieldtype": "Select",
-			"label": "Inbound Greeting Language",
-			"options": "hi-IN\nen-IN\nta-IN\nte-IN\nkn-IN",
-			"default": "hi-IN",
-			"depends_on": "eval:doc.enable_inbound_calls",
-			"description": "Fallback language for IVR prompts (callers choose via DTMF)"
-		},
-		{
-			"fieldname": "column_break_inbound",
-			"fieldtype": "Column Break"
-		},
-		{
-			"fieldname": "inbound_query_max_length",
-			"fieldtype": "Int",
-			"label": "Max Query Recording (seconds)",
-			"default": "120",
-			"depends_on": "eval:doc.enable_inbound_calls",
-			"description": "Maximum duration for the driver's free-speech query recording"
 		},
 		{
 			"fieldname": "notification_section",
 			"fieldtype": "Section Break",
-			"label": "Notification Settings",
-			"depends_on": "eval:doc.enabled"
+			"label": "Query Notifications"
 		},
 		{
 			"fieldname": "enable_whatsapp_notifications",
@@ -349,8 +399,7 @@
 		{
 			"fieldname": "voicemail_digest_section",
 			"fieldtype": "Section Break",
-			"label": "Voicemail Digest",
-			"depends_on": "eval:doc.enabled"
+			"label": "Voicemail Digest"
 		},
 		{
 			"fieldname": "enable_voicemail_digest",
@@ -402,18 +451,6 @@
 			"label": "Last Digest Sent",
 			"read_only": 1,
 			"hidden": 1
-		},
-		{
-			"fieldname": "ai_section",
-			"fieldtype": "Section Break",
-			"label": "AI Settings",
-			"depends_on": "eval:doc.enabled"
-		},
-		{
-			"fieldname": "anthropic_api_key",
-			"fieldtype": "Password",
-			"label": "Anthropic API Key",
-			"description": "API key for Claude-based query summarization"
 		}
 	],
 	"permissions": [
