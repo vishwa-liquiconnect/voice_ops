@@ -398,10 +398,16 @@ def _download_twilio_recording(recording_url):
 
 
 def _download_exotel_recording(recording_url):
-	"""Download from Exotel (typically S3 URLs, no auth needed)."""
+	"""Download from Exotel with API credentials (basic auth)."""
+	auth = None
+	if "exotel.com" in recording_url:
+		from requests.auth import HTTPBasicAuth
+		settings = frappe.get_single("Exotel Settings")
+		auth = HTTPBasicAuth(settings.api_key, settings.get_password("api_token"))
+
 	for attempt in range(3):
 		try:
-			response = requests.get(recording_url, timeout=60)
+			response = requests.get(recording_url, auth=auth, timeout=60)
 			response.raise_for_status()
 			if len(response.content) < 100:
 				if attempt < 2:

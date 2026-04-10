@@ -45,6 +45,29 @@ def fix_exotel_null_status(doc, method):
 		doc.recording_url = frappe.form_dict.get("RecordingUrl")
 
 
+def attach_exotel_recording(doc, method):
+	"""Download Exotel recording and attach as a file so it's playable from ERPNext."""
+	if not doc.recording_url or "exotel.com" not in doc.recording_url:
+		return
+
+	# Skip if already has an attached recording file
+	if frappe.db.exists("File", {"attached_to_doctype": "Call Log", "attached_to_name": doc.name, "file_name": ("like", "call_recording_%")}):
+		return
+
+	frappe.enqueue(
+		"voice_ops.jobs.call_log_handler._download_and_attach_exotel_recording",
+		queue="short",
+		call_log_name=doc.name,
+		recording_url=doc.recording_url,
+	)
+
+
+def _download_and_attach_exotel_recording(call_log_name, recording_url):
+	from voice_ops.services.telephony import download_and_attach_recording
+
+	download_and_attach_recording(call_log_name, recording_url, flow="outbound")
+
+
 def on_exotel_call_log_update(doc, method):
 	"""
 	Called on Call Log (Exotel) on_update (via doc_events hook).

@@ -18,6 +18,7 @@ doc_events = {
 	},
 	"Call Log": {
 		"before_validate": "voice_ops.jobs.call_log_handler.fix_exotel_null_status",
+		"after_insert": "voice_ops.jobs.call_log_handler.attach_exotel_recording",
 		"on_update": "voice_ops.jobs.call_log_handler.on_exotel_call_log_update",
 	},
 }
