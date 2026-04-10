@@ -44,6 +44,11 @@ def fix_exotel_null_status(doc, method):
 	if not doc.recording_url and frappe.form_dict.get("RecordingUrl"):
 		doc.recording_url = frappe.form_dict.get("RecordingUrl")
 
+	# Tag voicemail calls from Exotel webhook payload
+	if frappe.form_dict.get("CallType") == "voicemail":
+		if frappe.db.exists("Telephony Call Type", "Voicemail"):
+			doc.type_of_call = "Voicemail"
+
 
 def attach_exotel_recording(doc, method):
 	"""Download Exotel recording and attach as a file so it's playable from ERPNext."""
@@ -68,6 +73,29 @@ def _download_and_attach_exotel_recording(call_log_name, recording_url):
 	audio = _download_exotel_recording(recording_url)
 	if audio:
 		download_and_attach_recording(call_log_name, recording_url, audio_bytes=audio)
+		_transcribe_voicemail(call_log_name, audio, recording_url)
+
+
+def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
+	"""Transcribe voicemail recording to English and store in summary."""
+	type_of_call = frappe.db.get_value("Call Log", call_log_name, "type_of_call")
+	if type_of_call != "Voicemail":
+		return
+
+	from voice_ops.services.sarvam import transcribe_bytes
+
+	file_name = "voicemail.mp3" if ".mp3" in recording_url else "voicemail.wav"
+	try:
+		result = transcribe_bytes(audio_bytes, file_name=file_name)
+		transcript = result.get("transcript", "")
+		if transcript:
+			frappe.db.set_value("Call Log", call_log_name, "summary", transcript)
+			frappe.db.commit()
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: Voicemail transcription failed for {call_log_name}",
+		)
 
 
 def on_exotel_call_log_update(doc, method):
