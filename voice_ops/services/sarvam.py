@@ -1,22 +1,15 @@
 """
 Sarvam AI Service
 
-Handles speech-to-text transcription via Sarvam's REST API.
+Handles speech-to-text transcription via Sarvam's REST API (audio <= 30s)
+and batch SDK API (audio > 30s, up to 1 hour).
 
-API Reference:
+REST API Reference:
   POST https://api.sarvam.ai/speech-to-text/transcribe
   Headers: api-subscription-key: <key>
   Body: multipart/form-data with file, model, language_code
 
-Response:
-  {
-    "request_id": "...",
-    "transcript": "...",
-    "language_code": "ta-IN"
-  }
-
-Note: REST API supports audio up to ~30s. For longer recordings,
-the batch API (sarvamai SDK) should be used — see transcribe_bytes_batch().
+Batch API: Uses the sarvamai SDK for job-based async processing.
 """
 
 import os
@@ -147,6 +140,9 @@ def transcribe_bytes(audio_bytes, file_name="audio.wav"):
 		response = requests.post(url, headers=headers, files=files, data=data, timeout=120)
 		if not response.ok:
 			error_detail = response.text
+			# Fall back to batch API for audio exceeding 30s limit
+			if response.status_code == 400 and "maximum limit" in error_detail.lower():
+				return transcribe_bytes_batch(audio_bytes, file_name=file_name)
 			frappe.log_error(
 				title="Voice Ops: Sarvam STT Failed",
 				message=f"Status {response.status_code}: {error_detail}",
@@ -176,6 +172,99 @@ def transcribe_bytes(audio_bytes, file_name="audio.wav"):
 		"request_id": result.get("request_id", ""),
 		"raw_response": result,
 	}
+
+
+def transcribe_bytes_batch(audio_bytes, file_name="audio.wav"):
+	"""
+	Transcribe audio via Sarvam batch SDK API (for audio > 30s).
+
+	Writes bytes to a temp file, creates a batch job, waits for completion,
+	and returns the transcript.
+
+	Args:
+		audio_bytes: Raw audio content (bytes)
+		file_name: Filename hint (determines extension)
+
+	Returns:
+		dict with: transcript, language_code, request_id, raw_response
+	"""
+	if not audio_bytes:
+		return {
+			"transcript": "",
+			"language_code": "",
+			"request_id": "",
+			"raw_response": {"error": "Empty audio bytes"},
+		}
+
+	config = get_sarvam_settings()
+
+	try:
+		from sarvamai import SarvamAI
+
+		client = SarvamAI(api_subscription_key=config["api_key"])
+
+		ext = os.path.splitext(file_name)[1] or ".wav"
+		with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+			tmp.write(audio_bytes)
+			tmp_path = tmp.name
+
+		try:
+			job = client.speech_to_text_job.create_job(
+				model=config["model"],
+				mode=config.get("mode", "translate"),
+				language_code=config["language_code"],
+			)
+			job.upload_files(file_paths=[tmp_path])
+			job.start()
+			job.wait_until_complete()
+
+			file_results = job.get_file_results()
+			if file_results.get("successful"):
+				# Download outputs to a temp dir and read the transcript
+				with tempfile.TemporaryDirectory() as out_dir:
+					job.download_outputs(output_dir=out_dir)
+					# Batch API writes JSON files to output dir
+					import json
+					for f in os.listdir(out_dir):
+						if f.endswith(".json"):
+							with open(os.path.join(out_dir, f)) as jf:
+								result = json.load(jf)
+							transcript = result.get("transcript", "")
+							if not transcript and result.get("diarized_transcript"):
+								entries = result["diarized_transcript"].get("entries", [])
+								transcript = " ".join(e.get("transcript", "") for e in entries)
+							return {
+								"transcript": transcript,
+								"language_code": result.get("language_code", ""),
+								"request_id": result.get("request_id", ""),
+								"raw_response": result,
+							}
+
+			error_msg = str(file_results.get("failed", "Unknown batch error"))
+			frappe.log_error(
+				title="Voice Ops: Sarvam Batch STT Failed",
+				message=error_msg,
+			)
+			return {
+				"transcript": "",
+				"language_code": "",
+				"request_id": "",
+				"raw_response": {"error": error_msg},
+			}
+		finally:
+			os.unlink(tmp_path)
+
+	except Exception as e:
+		frappe.log_error(
+			title="Voice Ops: Sarvam Batch STT Failed",
+			message=f"Batch transcribe error: {e}\n{frappe.get_traceback()}",
+		)
+		return {
+			"transcript": "",
+			"language_code": "",
+			"request_id": "",
+			"raw_response": {"error": str(e)},
+		}
 
 
 def transcribe_from_url(audio_url):
