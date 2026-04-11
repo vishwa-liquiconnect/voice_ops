@@ -77,20 +77,28 @@ def _download_and_attach_exotel_recording(call_log_name, recording_url):
 
 
 def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
-	"""Transcribe voicemail recording to English and store in summary."""
+	"""Transcribe voicemail and store raw transcript + Claude summary."""
 	type_of_call = frappe.db.get_value("Call Log", call_log_name, "type_of_call")
 	if type_of_call != "Voicemail":
 		return
 
 	from voice_ops.services.sarvam import transcribe_bytes
+	from voice_ops.services.summarizer import summarize_voicemail
 
 	file_name = "voicemail.mp3" if ".mp3" in recording_url else "voicemail.wav"
 	try:
 		result = transcribe_bytes(audio_bytes, file_name=file_name)
-		transcript = result.get("transcript", "")
-		if transcript:
-			frappe.db.set_value("Call Log", call_log_name, "summary", transcript)
-			frappe.db.commit()
+		transcript = (result.get("transcript") or "").strip()
+		if not transcript:
+			return
+
+		summary = summarize_voicemail(transcript)
+		frappe.db.set_value(
+			"Call Log",
+			call_log_name,
+			{"transcript": transcript, "summary": summary or transcript},
+		)
+		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),

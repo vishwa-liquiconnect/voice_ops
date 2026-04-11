@@ -2,13 +2,74 @@
 Query Summarizer Service
 
 Uses Claude API (Anthropic) to generate concise English summaries
-of driver query transcripts. Falls back to simple extraction if
-the API is unavailable.
+of driver query transcripts and voicemails. Falls back to simple
+extraction if the API is unavailable.
 """
 
 import re
 
 import frappe
+
+
+def has_anthropic_key():
+	"""Return True if an Anthropic API key is configured in Voice Ops Settings."""
+	return bool(_get_anthropic_key())
+
+
+def summarize_voicemail(transcript, caller_info=None):
+	"""
+	Generate a concise summary of a voicemail transcript.
+
+	Uses Claude API when an Anthropic key is configured, otherwise returns
+	the raw transcript so callers can decide to keep it as-is.
+
+	Args:
+		transcript: English transcript of the voicemail
+		caller_info: Optional caller/contact context string
+
+	Returns:
+		Summary string (1-3 sentences) or the raw transcript on fallback.
+	"""
+	if not transcript or not transcript.strip():
+		return ""
+
+	api_key = _get_anthropic_key()
+	if not api_key:
+		return transcript.strip()
+
+	try:
+		return _summarize_voicemail_with_claude(transcript, caller_info, api_key)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			"Voice Ops: Claude voicemail summarization failed, using raw transcript",
+		)
+		return transcript.strip()
+
+
+def _summarize_voicemail_with_claude(transcript, caller_info, api_key):
+	"""Use Claude API to generate a voicemail summary."""
+	import anthropic
+
+	client = anthropic.Anthropic(api_key=api_key)
+
+	prompt = (
+		"Summarize the following voicemail in 1-3 concise sentences in English. "
+		"Capture the caller's intent, any vehicle/route identifiers mentioned, "
+		"and any action requested. Be direct and factual. "
+		"If the voicemail is empty or unintelligible, say so briefly.\n"
+	)
+	if caller_info:
+		prompt += f"\nCaller context: {caller_info}\n"
+	prompt += f"\nVoicemail transcript:\n{transcript}"
+
+	message = client.messages.create(
+		model="claude-haiku-4-5-20251001",
+		max_tokens=256,
+		messages=[{"role": "user", "content": prompt}],
+	)
+
+	return message.content[0].text.strip()
 
 
 def summarize_query(query_transcript, caller_name=None, bus_info=None):

@@ -9,7 +9,9 @@ frappe.ui.form.on("Call Log", {
 					freeze_message: __("Transcribing recording..."),
 					callback(r) {
 						if (r.message) {
-							frm.set_value("summary", r.message);
+							const { transcript, summary } = r.message;
+							if (transcript) frm.set_value("transcript", transcript);
+							if (summary) frm.set_value("summary", summary);
 							frm.save();
 							frappe.show_alert({
 								message: __("Recording transcribed successfully"),
