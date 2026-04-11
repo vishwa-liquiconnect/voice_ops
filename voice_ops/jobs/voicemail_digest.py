@@ -78,20 +78,28 @@ def _send_email_digest(settings, voicemails):
 	today = now_datetime().strftime("%Y-%m-%d")
 	subject = f"[Voice Ops] Voicemail Digest - {today} ({len(voicemails)} voicemail{'s' if len(voicemails) != 1 else ''})"
 
-	rows = ""
+	email_rows = ""
+	pdf_rows = ""
 	for i, vm in enumerate(voicemails, 1):
 		call_url = get_url(f"/app/call-log/{vm.name}")
 		time_str = format_datetime(vm.creation, "HH:mm") if vm.creation else ""
-		duration = f"{vm.duration or 0}s"
 		summary = vm.summary or "No transcript"
-		rows += f"""
+		caller = vm.get("from") or "Unknown"
+		email_rows += f"""
 		<tr>
 			<td style="padding: 8px; border: 1px solid #ddd;">{i}</td>
-			<td style="padding: 8px; border: 1px solid #ddd;">{vm.get("from") or "Unknown"}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{caller}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{time_str}</td>
-			<td style="padding: 8px; border: 1px solid #ddd;">{duration}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{summary}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;"><a href="{call_url}">View</a></td>
+		</tr>"""
+		pdf_rows += f"""
+		<tr>
+			<td style="padding: 8px; border: 1px solid #ddd;">{i}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{caller}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{time_str}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{summary}</td>
+			<td style="padding: 8px; border: 1px solid #ddd; word-break: break-all;">{call_url}</td>
 		</tr>"""
 
 	message = f"""
@@ -102,19 +110,54 @@ def _send_email_digest(settings, voicemails):
 			<th style="padding: 8px; border: 1px solid #ddd;">#</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Caller</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Time</th>
-			<th style="padding: 8px; border: 1px solid #ddd;">Duration</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Transcript</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Link</th>
 		</tr>
-		{rows}
+		{email_rows}
 	</table>
 	"""
+
+	pdf_html = f"""
+	<html>
+	<head><meta charset="utf-8"><title>Voicemail Digest - {today}</title></head>
+	<body style="font-family: Arial, sans-serif;">
+		<h2>Voicemail Digest - {today}</h2>
+		<p>{len(voicemails)} voicemail{'s' if len(voicemails) != 1 else ''} received.</p>
+		<table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+			<thead>
+				<tr style="background: #f5f5f5;">
+					<th style="padding: 8px; border: 1px solid #ddd;">#</th>
+					<th style="padding: 8px; border: 1px solid #ddd;">Caller</th>
+					<th style="padding: 8px; border: 1px solid #ddd;">Time</th>
+					<th style="padding: 8px; border: 1px solid #ddd;">Transcript</th>
+					<th style="padding: 8px; border: 1px solid #ddd;">Link</th>
+				</tr>
+			</thead>
+			<tbody>
+				{pdf_rows}
+			</tbody>
+		</table>
+	</body>
+	</html>
+	"""
+
+	attachments = []
+	try:
+		from frappe.utils.pdf import get_pdf
+		pdf_content = get_pdf(pdf_html)
+		attachments.append({
+			"fname": f"voicemail-digest-{today}.pdf",
+			"fcontent": pdf_content,
+		})
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: Voicemail Digest PDF Generation Failed")
 
 	try:
 		frappe.sendmail(
 			recipients=recipients,
 			subject=subject,
 			message=message,
+			attachments=attachments or None,
 		)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Voicemail Digest Email Failed")
