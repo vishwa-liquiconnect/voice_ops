@@ -93,31 +93,8 @@ def _enrich_callers(voicemails):
 			)
 			info = None
 		vm["caller_name"] = (info or {}).get("name") or ""
+		vm["caller_designation"] = (info or {}).get("designation") or ""
 		vm["caller_vehicle"] = (info or {}).get("vehicle_label") or ""
-
-
-def _format_caller_html(vm):
-	"""Render the caller cell: name (+ vehicle) with the number as subtext."""
-	number = vm.get("from") or "Unknown"
-	name = vm.get("caller_name")
-	vehicle = vm.get("caller_vehicle")
-	if name and vehicle:
-		return f"<strong>{name}</strong><br/><span style='color:#555;'>Vehicle: {vehicle}</span><br/><span style='color:#888;font-size:90%;'>{number}</span>"
-	if name:
-		return f"<strong>{name}</strong><br/><span style='color:#888;font-size:90%;'>{number}</span>"
-	return number
-
-
-def _format_caller_text(vm):
-	"""Flat string variant for WhatsApp."""
-	number = vm.get("from") or "Unknown"
-	name = vm.get("caller_name")
-	vehicle = vm.get("caller_vehicle")
-	if name and vehicle:
-		return f"{name} ({vehicle}, {number})"
-	if name:
-		return f"{name} ({number})"
-	return number
 
 
 def _send_email_digest(settings, voicemails, overall_summary=""):
@@ -135,11 +112,17 @@ def _send_email_digest(settings, voicemails, overall_summary=""):
 		call_url = get_url(f"/app/call-log/{vm.name}")
 		time_str = format_datetime(vm.creation, "HH:mm") if vm.creation else ""
 		summary = vm.summary or "No transcript"
-		caller_html = _format_caller_html(vm)
+		name = vm.get("caller_name") or "-"
+		mobile = vm.get("from") or "-"
+		designation = vm.get("caller_designation") or "-"
+		vehicle = vm.get("caller_vehicle") or "-"
 		email_rows += f"""
 		<tr>
 			<td style="padding: 8px; border: 1px solid #ddd;">{i}</td>
-			<td style="padding: 8px; border: 1px solid #ddd;">{caller_html}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{name}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{mobile}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{designation}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{vehicle}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{time_str}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{summary}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;"><a href="{call_url}">View</a></td>
@@ -147,7 +130,10 @@ def _send_email_digest(settings, voicemails, overall_summary=""):
 		pdf_rows += f"""
 		<tr>
 			<td style="padding: 8px; border: 1px solid #ddd;">{i}</td>
-			<td style="padding: 8px; border: 1px solid #ddd;">{caller_html}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{name}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{mobile}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{designation}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{vehicle}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{time_str}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{summary}</td>
 			<td style="padding: 8px; border: 1px solid #ddd; word-break: break-all;">{call_url}</td>
@@ -169,7 +155,10 @@ def _send_email_digest(settings, voicemails, overall_summary=""):
 	<table style="border-collapse: collapse; width: 100%;">
 		<tr style="background: #f5f5f5;">
 			<th style="padding: 8px; border: 1px solid #ddd;">#</th>
-			<th style="padding: 8px; border: 1px solid #ddd;">Caller</th>
+			<th style="padding: 8px; border: 1px solid #ddd;">Name</th>
+			<th style="padding: 8px; border: 1px solid #ddd;">Mobile</th>
+			<th style="padding: 8px; border: 1px solid #ddd;">Designation</th>
+			<th style="padding: 8px; border: 1px solid #ddd;">Vehicle</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Time</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Transcript</th>
 			<th style="padding: 8px; border: 1px solid #ddd;">Link</th>
@@ -246,7 +235,11 @@ def _send_whatsapp_digest(settings, voicemails, overall_summary=""):
 	for i, vm in enumerate(display, 1):
 		time_str = format_datetime(vm.creation, "HH:mm") if vm.creation else ""
 		summary = (vm.summary or "No transcript")[:100]
-		lines.append(f"{i}. From: {_format_caller_text(vm)} | {time_str} | {vm.duration or 0}s")
+		name = vm.get("caller_name") or "Unknown"
+		mobile = vm.get("from") or "-"
+		designation = vm.get("caller_designation") or "-"
+		vehicle = vm.get("caller_vehicle") or "-"
+		lines.append(f"{i}. {name} ({designation}) | {mobile} | Veh: {vehicle} | {time_str} | {vm.duration or 0}s")
 		lines.append(f"   {summary}")
 		lines.append("")
 

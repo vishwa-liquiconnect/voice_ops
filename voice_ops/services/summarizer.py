@@ -143,14 +143,15 @@ def _summarize_voicemail_digest_with_claude(voicemails, api_key):
 	for i, vm in enumerate(voicemails, 1):
 		number = vm.get("from") or "Unknown"
 		name = vm.get("caller_name")
+		designation = vm.get("caller_designation")
 		vehicle = vm.get("caller_vehicle")
 		when = format_datetime(vm.get("creation"), "yyyy-MM-dd HH:mm") if vm.get("creation") else ""
 		transcript = (vm.get("summary") or "").strip() or "(no transcript)"
 
-		if name and vehicle:
-			caller = f"{name} on vehicle {vehicle} (phone {number})"
-		elif name:
-			caller = f"{name} (phone {number})"
+		if name:
+			role = f" ({designation})" if designation else ""
+			veh = f" on vehicle {vehicle}" if vehicle else ""
+			caller = f"{name}{role}{veh} (phone {number})"
 		else:
 			caller = f"phone {number}"
 

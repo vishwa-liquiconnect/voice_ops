@@ -38,9 +38,14 @@ def resolve_caller(phone):
 	if not name:
 		return None
 
+	designation = ""
+	if employee:
+		designation = frappe.db.get_value("Employee", employee, "designation") or ""
+
 	return {
 		"name": name,
 		"employee": employee,
+		"designation": designation,
 		"vehicle_label": _most_recent_vehicle(employee) if employee else "",
 	}
 
