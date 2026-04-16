@@ -1,7 +1,9 @@
 frappe.ui.form.on("Call Log", {
 	refresh(frm) {
 		if (frm.doc.recording_url) {
-			render_proxied_player(frm);
+			// Wait a tick so ERPNext's setup_recording_audio_control runs first,
+			// then we replace its player with the proxied version.
+			setTimeout(() => replace_native_player(frm), 50);
 
 			frm.add_custom_button(__("Summarize Recording"), function () {
 				frappe.call({
@@ -27,27 +29,37 @@ frappe.ui.form.on("Call Log", {
 	},
 });
 
-function render_proxied_player(frm) {
+function replace_native_player(frm) {
+	if (!frm.doc.recording_url) return;
+
 	const proxy_url =
 		"/api/method/voice_ops.api.call_log.stream_recording?call_log=" +
 		encodeURIComponent(frm.doc.name);
 
-	const html = `
-		<div class="frappe-control" style="padding: 8px 0;">
-			<label class="control-label" style="padding-right: 0px;">${__("Recording")}</label>
-			<audio controls preload="none" style="width: 100%; margin-top: 8px;">
-				<source src="${proxy_url}" type="audio/mpeg">
-				${__("Your browser does not support the audio element.")}
-			</audio>
-			<div style="margin-top: 4px;">
-				<a href="${proxy_url}" download class="text-muted small">${__("Download")}</a>
-			</div>
-		</div>
-	`;
+	const recording_field = frm.get_field("recording_html");
+	if (!recording_field) return;
 
-	const wrapper = frm.get_field("recording_url")?.$wrapper;
-	if (wrapper) {
-		wrapper.find(".voice-ops-player").remove();
-		wrapper.append(`<div class="voice-ops-player">${html}</div>`);
-	}
+	const wrapper = recording_field.$wrapper;
+
+	// Abort any in-flight audio load from ERPNext's native player before the
+	// browser has a chance to challenge us for Basic Auth.
+	wrapper.find("audio").each(function () {
+		try {
+			this.pause();
+			this.removeAttribute("src");
+			this.load();
+		} catch (e) {
+			// ignore
+		}
+	});
+
+	wrapper.empty().addClass("input-max-width").html(`
+		<audio controls preload="none" style="width: 100%;">
+			<source src="${proxy_url}" type="audio/mpeg">
+			${__("Your browser does not support the audio element.")}
+		</audio>
+		<div style="margin-top: 4px;">
+			<a href="${proxy_url}" download class="text-muted small">${__("Download recording")}</a>
+		</div>
+	`);
 }
