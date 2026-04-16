@@ -13,17 +13,27 @@ import frappe
 def resolve_caller(phone):
 	"""Resolve a phone number to `{name, employee, vehicle_label}`.
 
-	Returns None when no Contact or Employee match is found.
-	When an Employee is found but has never been rostered, `vehicle_label`
-	is an empty string.
+	Runs three independent lookups (Contact, Employee, Trip Crew Member)
+	and merges: prefers a Contact-side human name, but still picks up the
+	Employee id from any source so the vehicle lookup can run. Returns
+	None when no source matches at all.
 	"""
 	norm = _normalize(phone)
 	if not norm:
 		return None
 
-	name, employee = _lookup_contact(norm)
-	if not name:
-		name, employee = _lookup_employee(norm)
+	contact_name, contact_employee = _lookup_contact(norm)
+	emp_name, emp_id = _lookup_employee(norm)
+
+	# If neither Contact nor Employee gave us an employee id, try Trip Crew
+	# Member — its mobile_number is usually fetched from the Employee but
+	# occasionally that's the only place the number lives cleanly.
+	crew_name, crew_emp_id = (None, None)
+	if not contact_employee and not emp_id:
+		crew_name, crew_emp_id = _lookup_trip_crew_member(norm)
+
+	name = contact_name or emp_name or crew_name
+	employee = contact_employee or emp_id or crew_emp_id
 
 	if not name:
 		return None
@@ -87,6 +97,24 @@ def _lookup_employee(norm):
 			emp = rows[0]
 			return (emp.employee_name or emp.name, emp.name)
 	return None, None
+
+
+def _lookup_trip_crew_member(norm):
+	"""Return (employee_name, employee_id) from a Trip Crew Member whose
+	own `mobile_number` matches the normalized digits."""
+	try:
+		rows = frappe.db.get_all(
+			"Trip Crew Member",
+			filters={"mobile_number": ("like", f"%{norm}%")},
+			fields=["employee", "employee_name"],
+			limit=1,
+		)
+	except Exception:
+		return None, None
+	if not rows:
+		return None, None
+	row = rows[0]
+	return (row.employee_name or row.employee, row.employee)
 
 
 def _most_recent_vehicle(employee):
