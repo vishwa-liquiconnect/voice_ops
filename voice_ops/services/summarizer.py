@@ -97,11 +97,47 @@ def summarize_voicemail_digest(voicemails):
 		return ""
 
 
+_DEFAULT_DIGEST_CONTEXT = (
+	"You are an AI assistant for a bus-fleet operations team. "
+	"You review voicemails left by drivers and callers reporting "
+	"vehicle issues, accidents, complaints, and operational concerns."
+)
+
+
+def _get_digest_context():
+	"""Pull the business context from FMS AI Settings.
+
+	Returns the assembled system prompt when the settings doc has any
+	meaningful fields populated; otherwise returns an empty string so the
+	caller can fall back to the hardcoded default.
+	"""
+	try:
+		settings = frappe.get_single("FMS AI Settings")
+	except Exception:
+		return ""
+
+	has_content = bool(
+		(settings.get("nature_of_business") or "").strip()
+		or (settings.get("business_description") or "").strip()
+		or settings.get("context_rules")
+		or settings.get("doctype_references")
+	)
+	if not has_content:
+		return ""
+
+	try:
+		return (settings.build_system_prompt() or "").strip()
+	except Exception:
+		return ""
+
+
 def _summarize_voicemail_digest_with_claude(voicemails, api_key):
 	import anthropic
 	from frappe.utils import format_datetime
 
 	client = anthropic.Anthropic(api_key=api_key)
+
+	system_prompt = _get_digest_context() or _DEFAULT_DIGEST_CONTEXT
 
 	lines = []
 	for i, vm in enumerate(voicemails, 1):
@@ -110,21 +146,22 @@ def _summarize_voicemail_digest_with_claude(voicemails, api_key):
 		transcript = (vm.get("summary") or "").strip() or "(no transcript)"
 		lines.append(f"{i}. [{when}] {caller}: {transcript}")
 
-	prompt = (
-		"You are reviewing a batch of voicemails received by a bus-fleet operations team. "
-		"Write ONE concise overall summary (3-6 sentences) that synthesizes the batch. Capture: "
+	user_prompt = (
+		f"Review this batch of {len(voicemails)} voicemails and write ONE concise overall summary "
+		"(3-6 sentences) that synthesizes the batch. Capture: "
 		"(1) the most urgent or critical issues, "
 		"(2) vehicles or routes mentioned repeatedly, "
 		"(3) any recurring themes or complaints, and "
 		"(4) total volume and rough breakdown. "
 		"Do not list each voicemail individually. Be factual, direct, and brief.\n\n"
-		f"Voicemails ({len(voicemails)} total):\n" + "\n".join(lines)
+		"Voicemails:\n" + "\n".join(lines)
 	)
 
 	message = client.messages.create(
 		model="claude-haiku-4-5-20251001",
 		max_tokens=512,
-		messages=[{"role": "user", "content": prompt}],
+		system=system_prompt,
+		messages=[{"role": "user", "content": user_prompt}],
 	)
 	return message.content[0].text.strip()
 
