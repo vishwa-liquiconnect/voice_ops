@@ -72,6 +72,63 @@ def _summarize_voicemail_with_claude(transcript, caller_info, api_key):
 	return message.content[0].text.strip()
 
 
+def summarize_voicemail_digest(voicemails):
+	"""Produce one cumulative summary across a batch of voicemail transcripts.
+
+	Each voicemail is a dict with at least `from`, `creation`, and `summary`
+	(which holds the raw transcript at digest time). Returns an empty string
+	when Claude isn't configured or on failure — the caller can then skip
+	the overall-summary section.
+	"""
+	if not voicemails:
+		return ""
+
+	api_key = _get_anthropic_key()
+	if not api_key:
+		return ""
+
+	try:
+		return _summarize_voicemail_digest_with_claude(voicemails, api_key)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			"Voice Ops: Claude digest summarization failed",
+		)
+		return ""
+
+
+def _summarize_voicemail_digest_with_claude(voicemails, api_key):
+	import anthropic
+	from frappe.utils import format_datetime
+
+	client = anthropic.Anthropic(api_key=api_key)
+
+	lines = []
+	for i, vm in enumerate(voicemails, 1):
+		caller = vm.get("from") or "Unknown"
+		when = format_datetime(vm.get("creation"), "yyyy-MM-dd HH:mm") if vm.get("creation") else ""
+		transcript = (vm.get("summary") or "").strip() or "(no transcript)"
+		lines.append(f"{i}. [{when}] {caller}: {transcript}")
+
+	prompt = (
+		"You are reviewing a batch of voicemails received by a bus-fleet operations team. "
+		"Write ONE concise overall summary (3-6 sentences) that synthesizes the batch. Capture: "
+		"(1) the most urgent or critical issues, "
+		"(2) vehicles or routes mentioned repeatedly, "
+		"(3) any recurring themes or complaints, and "
+		"(4) total volume and rough breakdown. "
+		"Do not list each voicemail individually. Be factual, direct, and brief.\n\n"
+		f"Voicemails ({len(voicemails)} total):\n" + "\n".join(lines)
+	)
+
+	message = client.messages.create(
+		model="claude-haiku-4-5-20251001",
+		max_tokens=512,
+		messages=[{"role": "user", "content": prompt}],
+	)
+	return message.content[0].text.strip()
+
+
 def summarize_query(query_transcript, caller_name=None, bus_info=None):
 	"""
 	Generate a concise summary of a driver query transcript.

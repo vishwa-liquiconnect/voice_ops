@@ -33,15 +33,16 @@ def check_and_send():
 	if not voicemails:
 		return
 
-	_summarize_voicemails(voicemails)
+	from voice_ops.services.summarizer import summarize_voicemail_digest
+	overall_summary = summarize_voicemail_digest(voicemails)
 
 	channel = settings.voicemail_digest_channel or "Email"
 
 	if channel in ("Email", "Both"):
-		_send_email_digest(settings, voicemails)
+		_send_email_digest(settings, voicemails, overall_summary)
 
 	if channel in ("WhatsApp", "Both"):
-		_send_whatsapp_digest(settings, voicemails)
+		_send_whatsapp_digest(settings, voicemails, overall_summary)
 
 
 def _is_digest_time(settings):
@@ -71,32 +72,7 @@ def _fetch_voicemails(since_dt):
 	""", (since_dt,), as_dict=True)
 
 
-def _summarize_voicemails(voicemails):
-	"""Replace each voicemail's stored transcript with a Claude summary.
-
-	At capture time the `summary` column holds the raw Sarvam transcript.
-	Right before sending the digest we summarize each one and persist the
-	result so the Call Log and the outgoing email/WhatsApp carry the same
-	concise text. Falls back to the transcript if no Anthropic key.
-	"""
-	from voice_ops.services.summarizer import summarize_voicemail
-
-	dirty = False
-	for vm in voicemails:
-		transcript = (vm.summary or "").strip()
-		if not transcript:
-			continue
-		caller_info = vm.get("from") or None
-		summary = summarize_voicemail(transcript, caller_info=caller_info)
-		if summary and summary != transcript:
-			vm.summary = summary
-			frappe.db.set_value("Call Log", vm.name, "summary", summary, update_modified=False)
-			dirty = True
-	if dirty:
-		frappe.db.commit()
-
-
-def _send_email_digest(settings, voicemails):
+def _send_email_digest(settings, voicemails, overall_summary=""):
 	"""Send voicemail digest via email."""
 	recipients = [e.strip() for e in (settings.voicemail_digest_email or "").split(",") if e.strip()]
 	if not recipients:
@@ -129,9 +105,19 @@ def _send_email_digest(settings, voicemails):
 			<td style="padding: 8px; border: 1px solid #ddd; word-break: break-all;">{call_url}</td>
 		</tr>"""
 
+	overall_html = ""
+	if overall_summary:
+		overall_html = f"""
+		<div style="background: #f5faff; border-left: 4px solid #2b6cb0; padding: 12px 16px; margin: 12px 0 20px;">
+			<div style="font-weight: 600; margin-bottom: 6px;">Overall Summary</div>
+			<div style="white-space: pre-wrap;">{overall_summary}</div>
+		</div>
+		"""
+
 	message = f"""
 	<h3>Voicemail Digest - {today}</h3>
 	<p>{len(voicemails)} voicemail{'s' if len(voicemails) != 1 else ''} received.</p>
+	{overall_html}
 	<table style="border-collapse: collapse; width: 100%;">
 		<tr style="background: #f5f5f5;">
 			<th style="padding: 8px; border: 1px solid #ddd;">#</th>
@@ -150,6 +136,7 @@ def _send_email_digest(settings, voicemails):
 	<body style="font-family: Arial, sans-serif;">
 		<h2>Voicemail Digest - {today}</h2>
 		<p>{len(voicemails)} voicemail{'s' if len(voicemails) != 1 else ''} received.</p>
+		{overall_html}
 		<table style="border-collapse: collapse; width: 100%; font-size: 12px;">
 			<thead>
 				<tr style="background: #f5f5f5;">
@@ -190,7 +177,7 @@ def _send_email_digest(settings, voicemails):
 		frappe.log_error(frappe.get_traceback(), "Voice Ops: Voicemail Digest Email Failed")
 
 
-def _send_whatsapp_digest(settings, voicemails):
+def _send_whatsapp_digest(settings, voicemails, overall_summary=""):
 	"""Send voicemail digest via WhatsApp."""
 	phones = [p.strip() for p in (settings.voicemail_digest_phone or "").split(",") if p.strip()]
 	if not phones:
@@ -200,6 +187,11 @@ def _send_whatsapp_digest(settings, voicemails):
 
 	today = now_datetime().strftime("%Y-%m-%d")
 	lines = [f"*Voicemail Digest* ({len(voicemails)} voicemail{'s' if len(voicemails) != 1 else ''})", f"Date: {today}", ""]
+
+	if overall_summary:
+		lines.append("*Overall Summary*")
+		lines.append(overall_summary)
+		lines.append("")
 
 	# Truncate to 20 for WhatsApp message size limits
 	display = voicemails[:20]
