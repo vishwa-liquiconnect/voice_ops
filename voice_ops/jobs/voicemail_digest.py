@@ -33,6 +33,8 @@ def check_and_send():
 	if not voicemails:
 		return
 
+	_enrich_callers(voicemails)
+
 	from voice_ops.services.summarizer import summarize_voicemail_digest
 	overall_summary = summarize_voicemail_digest(voicemails)
 
@@ -72,6 +74,52 @@ def _fetch_voicemails(since_dt):
 	""", (since_dt,), as_dict=True)
 
 
+def _enrich_callers(voicemails):
+	"""Attach `caller_name` and `caller_vehicle` to each voicemail dict by
+	resolving the `from` number against Contact / Employee / Trip Roster.
+
+	Swallows per-voicemail lookup errors so a single bad row (e.g. a
+	missing doctype on an unusual bench) doesn't abort the whole digest.
+	"""
+	from voice_ops.services.caller_lookup import resolve_caller
+
+	for vm in voicemails:
+		try:
+			info = resolve_caller(vm.get("from"))
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Voice Ops: caller lookup failed for {vm.get('from')}",
+			)
+			info = None
+		vm["caller_name"] = (info or {}).get("name") or ""
+		vm["caller_vehicle"] = (info or {}).get("vehicle_label") or ""
+
+
+def _format_caller_html(vm):
+	"""Render the caller cell: name (+ vehicle) with the number as subtext."""
+	number = vm.get("from") or "Unknown"
+	name = vm.get("caller_name")
+	vehicle = vm.get("caller_vehicle")
+	if name and vehicle:
+		return f"<strong>{name}</strong><br/><span style='color:#555;'>Vehicle: {vehicle}</span><br/><span style='color:#888;font-size:90%;'>{number}</span>"
+	if name:
+		return f"<strong>{name}</strong><br/><span style='color:#888;font-size:90%;'>{number}</span>"
+	return number
+
+
+def _format_caller_text(vm):
+	"""Flat string variant for WhatsApp."""
+	number = vm.get("from") or "Unknown"
+	name = vm.get("caller_name")
+	vehicle = vm.get("caller_vehicle")
+	if name and vehicle:
+		return f"{name} ({vehicle}, {number})"
+	if name:
+		return f"{name} ({number})"
+	return number
+
+
 def _send_email_digest(settings, voicemails, overall_summary=""):
 	"""Send voicemail digest via email."""
 	recipients = [e.strip() for e in (settings.voicemail_digest_email or "").split(",") if e.strip()]
@@ -87,11 +135,11 @@ def _send_email_digest(settings, voicemails, overall_summary=""):
 		call_url = get_url(f"/app/call-log/{vm.name}")
 		time_str = format_datetime(vm.creation, "HH:mm") if vm.creation else ""
 		summary = vm.summary or "No transcript"
-		caller = vm.get("from") or "Unknown"
+		caller_html = _format_caller_html(vm)
 		email_rows += f"""
 		<tr>
 			<td style="padding: 8px; border: 1px solid #ddd;">{i}</td>
-			<td style="padding: 8px; border: 1px solid #ddd;">{caller}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{caller_html}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{time_str}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{summary}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;"><a href="{call_url}">View</a></td>
@@ -99,7 +147,7 @@ def _send_email_digest(settings, voicemails, overall_summary=""):
 		pdf_rows += f"""
 		<tr>
 			<td style="padding: 8px; border: 1px solid #ddd;">{i}</td>
-			<td style="padding: 8px; border: 1px solid #ddd;">{caller}</td>
+			<td style="padding: 8px; border: 1px solid #ddd;">{caller_html}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{time_str}</td>
 			<td style="padding: 8px; border: 1px solid #ddd;">{summary}</td>
 			<td style="padding: 8px; border: 1px solid #ddd; word-break: break-all;">{call_url}</td>
@@ -198,7 +246,7 @@ def _send_whatsapp_digest(settings, voicemails, overall_summary=""):
 	for i, vm in enumerate(display, 1):
 		time_str = format_datetime(vm.creation, "HH:mm") if vm.creation else ""
 		summary = (vm.summary or "No transcript")[:100]
-		lines.append(f"{i}. From: {vm.get('from') or 'Unknown'} | {time_str} | {vm.duration or 0}s")
+		lines.append(f"{i}. From: {_format_caller_text(vm)} | {time_str} | {vm.duration or 0}s")
 		lines.append(f"   {summary}")
 		lines.append("")
 
