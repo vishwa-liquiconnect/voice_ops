@@ -47,11 +47,11 @@ def stream_recording(call_log=None, url=None):
 
 
 @frappe.whitelist()
-def summarize_recording(call_log_name):
-	"""
-	Transcribe a Call Log recording to English and generate a Claude
-	summary (if the Anthropic key is configured). Returns both so the
-	client can populate `transcript` and `summary` fields.
+def transcribe_recording(call_log_name):
+	"""Transcribe a Call Log recording to English and return the transcript.
+
+	The caller writes this into the `summary` field. Claude summarization is
+	handled at digest time, not here.
 	"""
 	doc = frappe.get_doc("Call Log", call_log_name)
 	if not doc.recording_url:
@@ -59,7 +59,6 @@ def summarize_recording(call_log_name):
 
 	from voice_ops.services.telephony import _download_exotel_recording
 	from voice_ops.services.sarvam import transcribe_bytes
-	from voice_ops.services.summarizer import summarize_voicemail
 
 	audio = _download_exotel_recording(doc.recording_url)
 	if not audio:
@@ -72,6 +71,4 @@ def summarize_recording(call_log_name):
 	if not transcript:
 		frappe.throw("Transcription returned empty result.")
 
-	summary = summarize_voicemail(transcript)
-
-	return {"transcript": transcript, "summary": summary or transcript}
+	return {"transcript": transcript}

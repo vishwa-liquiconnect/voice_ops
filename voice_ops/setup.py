@@ -11,33 +11,6 @@ import frappe
 def after_install():
 	create_default_templates()
 	ensure_telephony_call_types()
-	ensure_call_log_custom_fields()
-
-
-def after_migrate():
-	"""Run idempotent schema setup on every migrate."""
-	ensure_call_log_custom_fields()
-
-
-def ensure_call_log_custom_fields():
-	"""Add the `transcript` custom field to Call Log if missing.
-
-	Holds the raw Sarvam transcript alongside `summary` (which stores
-	the Claude-generated summary when the Anthropic key is configured).
-	"""
-	from frappe.custom.doctype.custom_field.custom_field import create_custom_field
-
-	create_custom_field(
-		"Call Log",
-		{
-			"fieldname": "transcript",
-			"label": "Transcript",
-			"fieldtype": "Long Text",
-			"insert_after": "summary",
-			"read_only": 0,
-			"description": "Raw transcription from Sarvam. `summary` holds the Claude summary.",
-		},
-	)
 
 
 def ensure_telephony_call_types():

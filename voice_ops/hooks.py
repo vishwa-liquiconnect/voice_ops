@@ -8,7 +8,6 @@ app_license = "mit"
 required_apps = ["frappe", "erpnext"]
 
 after_install = "voice_ops.setup.after_install"
-after_migrate = "voice_ops.setup.after_migrate"
 
 # Doctype JS
 # ----------

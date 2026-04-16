@@ -33,6 +33,8 @@ def check_and_send():
 	if not voicemails:
 		return
 
+	_summarize_voicemails(voicemails)
+
 	channel = settings.voicemail_digest_channel or "Email"
 
 	if channel in ("Email", "Both"):
@@ -67,6 +69,31 @@ def _fetch_voicemails(since_dt):
 		AND creation >= %s
 		ORDER BY creation ASC
 	""", (since_dt,), as_dict=True)
+
+
+def _summarize_voicemails(voicemails):
+	"""Replace each voicemail's stored transcript with a Claude summary.
+
+	At capture time the `summary` column holds the raw Sarvam transcript.
+	Right before sending the digest we summarize each one and persist the
+	result so the Call Log and the outgoing email/WhatsApp carry the same
+	concise text. Falls back to the transcript if no Anthropic key.
+	"""
+	from voice_ops.services.summarizer import summarize_voicemail
+
+	dirty = False
+	for vm in voicemails:
+		transcript = (vm.summary or "").strip()
+		if not transcript:
+			continue
+		caller_info = vm.get("from") or None
+		summary = summarize_voicemail(transcript, caller_info=caller_info)
+		if summary and summary != transcript:
+			vm.summary = summary
+			frappe.db.set_value("Call Log", vm.name, "summary", summary, update_modified=False)
+			dirty = True
+	if dirty:
+		frappe.db.commit()
 
 
 def _send_email_digest(settings, voicemails):
