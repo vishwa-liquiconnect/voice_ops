@@ -102,6 +102,13 @@ def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
 			frappe.get_traceback(),
 			f"Voice Ops: Voicemail transcription failed for {call_log_name}",
 		)
+		return
+
+	frappe.enqueue(
+		"voice_ops.jobs.create_call_log_issue.run",
+		queue="long",
+		call_log_name=call_log_name,
+	)
 
 
 def on_exotel_call_log_update(doc, method):

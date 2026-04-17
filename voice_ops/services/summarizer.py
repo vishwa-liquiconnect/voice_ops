@@ -177,6 +177,100 @@ def _summarize_voicemail_digest_with_claude(voicemails, api_key):
 	return message.content[0].text.strip()
 
 
+def generate_issue_payload(call_log_info, summary):
+	"""Ask Claude to turn a Call Log summary into an Issue payload.
+
+	Returns a dict with keys `subject`, `description`, `priority` (one of
+	Low/Medium/High) on success, or None when Claude isn't configured,
+	the call fails, or the response can't be parsed as JSON.
+
+	`call_log_info` is a dict-ish with at least `name`, `from`,
+	`type_of_call`, `duration`, and optionally caller enrichment keys.
+	"""
+	if not summary or not summary.strip():
+		return None
+
+	api_key = _get_anthropic_key()
+	if not api_key:
+		return None
+
+	try:
+		return _generate_issue_payload_with_claude(call_log_info, summary, api_key)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			"Voice Ops: Claude issue generation failed",
+		)
+		return None
+
+
+def _generate_issue_payload_with_claude(call_log_info, summary, api_key):
+	import json as _json
+
+	import anthropic
+
+	client = anthropic.Anthropic(api_key=api_key)
+	system_prompt = _get_digest_context() or _DEFAULT_DIGEST_CONTEXT
+
+	name = call_log_info.get("caller_name") or ""
+	designation = call_log_info.get("caller_designation") or ""
+	vehicle = call_log_info.get("caller_vehicle") or ""
+	caller_bits = []
+	if name:
+		caller_bits.append(name)
+	if designation:
+		caller_bits.append(f"({designation})")
+	if vehicle:
+		caller_bits.append(f"vehicle {vehicle}")
+	caller_line = " ".join(caller_bits) or "Unknown caller"
+
+	user_prompt = (
+		"Convert the following call summary into a support Issue ticket.\n\n"
+		f"Caller: {caller_line}\n"
+		f"Phone: {call_log_info.get('from') or 'Unknown'}\n"
+		f"Call type: {call_log_info.get('type_of_call') or 'Unknown'}\n"
+		f"Duration (s): {call_log_info.get('duration') or 0}\n\n"
+		f"Summary / Transcript:\n{summary}\n\n"
+		"Return ONLY a JSON object with exactly these keys:\n"
+		"  subject: short title, max ~80 chars\n"
+		"  description: clear, factual description, 2-4 sentences\n"
+		"  priority: one of Low, Medium, High\n"
+		"Use High for safety issues, breakdowns, accidents, or incidents. "
+		"Use Medium for operational problems needing prompt action. "
+		"Use Low for routine feedback or informational messages.\n"
+		"Respond with JSON only, no commentary, no code fences."
+	)
+
+	message = client.messages.create(
+		model="claude-haiku-4-5-20251001",
+		max_tokens=512,
+		system=system_prompt,
+		messages=[{"role": "user", "content": user_prompt}],
+	)
+	text = _strip_code_fences((message.content[0].text or "").strip())
+	try:
+		payload = _json.loads(text)
+	except Exception:
+		frappe.log_error(
+			f"Voice Ops: Claude issue payload not valid JSON:\n{text}",
+			"Voice Ops: Issue payload parse failed",
+		)
+		return None
+
+	if not isinstance(payload, dict):
+		return None
+	return payload
+
+
+def _strip_code_fences(text):
+	if not text.startswith("```"):
+		return text
+	text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+	if text.rstrip().endswith("```"):
+		text = text.rstrip()[:-3]
+	return text.strip()
+
+
 def summarize_query(query_transcript, caller_name=None, bus_info=None):
 	"""
 	Generate a concise summary of a driver query transcript.
