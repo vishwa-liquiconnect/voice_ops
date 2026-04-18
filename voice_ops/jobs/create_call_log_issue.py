@@ -13,6 +13,8 @@ import frappe
 
 ALLOWED_PRIORITIES = ("Low", "Medium", "High")
 PRIORITY_FALLBACK = "Medium"
+ALLOWED_LEVELS = ("Vehicle", "Office")
+LEVEL_FALLBACK = "Vehicle"
 
 
 def run(call_log_name):
@@ -44,6 +46,7 @@ def run(call_log_name):
 	subject = (payload.get("subject") or "").strip() or f"Call {call_log_name}"
 	description = (payload.get("description") or "").strip() or summary
 	priority = _resolve_priority(payload.get("priority"))
+	level = _resolve_level(payload.get("level"))
 
 	description_with_ref = (
 		f"{description}"
@@ -56,6 +59,7 @@ def run(call_log_name):
 		"subject": subject[:140],
 		"description": description_with_ref,
 		"status": "Open",
+		"custom_select_level": level,
 	}
 	if priority:
 		doc["priority"] = priority
@@ -94,6 +98,14 @@ def _resolve_priority(raw):
 
 def _fallback_priority():
 	return PRIORITY_FALLBACK if frappe.db.exists("Issue Priority", PRIORITY_FALLBACK) else None
+
+
+def _resolve_level(raw):
+	if raw:
+		value = str(raw).strip().title()
+		if value in ALLOWED_LEVELS:
+			return value
+	return LEVEL_FALLBACK
 
 
 def _enrich_caller(call_log):

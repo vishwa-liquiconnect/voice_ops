@@ -235,9 +235,12 @@ def _generate_issue_payload_with_claude(call_log_info, summary, api_key):
 		"  subject: short title, max ~80 chars\n"
 		"  description: clear, factual description, 2-4 sentences\n"
 		"  priority: one of Low, Medium, High\n"
+		"  level: one of Vehicle, Office\n"
 		"Use High for safety issues, breakdowns, accidents, or incidents. "
 		"Use Medium for operational problems needing prompt action. "
 		"Use Low for routine feedback or informational messages.\n"
+		"Use Vehicle when the call is about a bus / driver / trip / on-road issue. "
+		"Use Office when the call is about payments, admin, HR, or back-office matters.\n"
 		"Respond with JSON only, no commentary, no code fences."
 	)
 
