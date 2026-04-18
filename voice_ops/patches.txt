@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 voice_ops.patches.create_voicemail_call_type
 voice_ops.patches.drop_call_log_transcript_field
+voice_ops.patches.add_call_log_detected_language

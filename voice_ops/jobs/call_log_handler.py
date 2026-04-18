@@ -95,7 +95,11 @@ def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
 		if not transcript:
 			return
 
-		frappe.db.set_value("Call Log", call_log_name, "summary", transcript)
+		updates = {"summary": transcript}
+		language_code = (result.get("language_code") or "").strip()
+		if language_code:
+			updates["custom_detected_language"] = language_code
+		frappe.db.set_value("Call Log", call_log_name, updates)
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
