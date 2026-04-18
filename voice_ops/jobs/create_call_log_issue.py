@@ -68,6 +68,10 @@ def run(call_log_name):
 	if contact_id and frappe.db.exists("Contact", contact_id):
 		doc["contact"] = contact_id
 
+	email = (call_log.get("caller_email") or "").strip()
+	if email and "@" in email:
+		doc["raised_by"] = email
+
 	vehicle_id = call_log.get("caller_vehicle_id")
 	if level == "Vehicle" and vehicle_id and frappe.db.exists("Vehicle", vehicle_id):
 		doc["custom_vehicle"] = vehicle_id
@@ -129,6 +133,7 @@ def _enrich_caller(call_log):
 	call_log["caller_vehicle"] = info.get("vehicle_label") or ""
 	call_log["caller_contact"] = info.get("contact") or ""
 	call_log["caller_vehicle_id"] = info.get("vehicle") or ""
+	call_log["caller_email"] = info.get("email") or ""
 
 
 def _resolve_company():

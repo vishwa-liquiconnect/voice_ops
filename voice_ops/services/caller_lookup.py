@@ -11,7 +11,7 @@ import frappe
 
 
 def resolve_caller(phone):
-	"""Resolve a phone number to `{name, contact, employee, vehicle, vehicle_label}`.
+	"""Resolve a phone number to `{name, contact, employee, email, vehicle, vehicle_label}`.
 
 	Runs three independent lookups (Contact, Employee, Trip Crew Member)
 	and merges: prefers a Contact-side human name, but still picks up the
@@ -22,7 +22,7 @@ def resolve_caller(phone):
 	if not norm:
 		return None
 
-	contact_id, contact_name, contact_employee = _lookup_contact(norm)
+	contact_id, contact_name, contact_employee, contact_email = _lookup_contact(norm)
 	emp_name, emp_id = _lookup_employee(norm)
 
 	# If neither Contact nor Employee gave us an employee id, try Trip Crew
@@ -43,12 +43,14 @@ def resolve_caller(phone):
 		designation = frappe.db.get_value("Employee", employee, "designation") or ""
 
 	vehicle_id, vehicle_label = _most_recent_vehicle(employee) if employee else ("", "")
+	email = contact_email or _employee_email(employee)
 
 	return {
 		"name": name,
 		"contact": contact_id,
 		"employee": employee,
 		"designation": designation,
+		"email": email,
 		"vehicle": vehicle_id,
 		"vehicle_label": vehicle_label,
 	}
@@ -71,12 +73,12 @@ def _lookup_contact(norm):
 		limit=1,
 	)
 	if not rows:
-		return None, None, None
+		return None, None, None, None
 
 	try:
 		contact = frappe.get_doc("Contact", rows[0].parent)
 	except Exception:
-		return None, None, None
+		return None, None, None, None
 
 	name = (contact.full_name or contact.first_name or "").strip()
 	employee = None
@@ -85,7 +87,42 @@ def _lookup_contact(norm):
 			employee = link.link_name
 			break
 
-	return (contact.name, name or None, employee)
+	email = _primary_contact_email(contact)
+
+	return (contact.name, name or None, employee, email)
+
+
+def _primary_contact_email(contact):
+	"""Pick a usable email from a Contact: primary email_id first,
+	else the first Contact Email child row."""
+	email = (getattr(contact, "email_id", "") or "").strip()
+	if email:
+		return email
+	for row in (contact.email_ids or []):
+		candidate = (getattr(row, "email_id", "") or "").strip()
+		if candidate:
+			return candidate
+	return ""
+
+
+def _employee_email(employee):
+	"""Prefer company_email, then user_id, then personal_email."""
+	if not employee:
+		return ""
+	try:
+		row = frappe.db.get_value(
+			"Employee",
+			employee,
+			["company_email", "user_id", "personal_email"],
+			as_dict=True,
+		) or {}
+	except Exception:
+		return ""
+	for key in ("company_email", "user_id", "personal_email"):
+		value = (row.get(key) or "").strip()
+		if value and "@" in value:
+			return value
+	return ""
 
 
 def _lookup_employee(norm):
