@@ -9,6 +9,13 @@ required_apps = ["frappe", "erpnext"]
 
 after_install = "voice_ops.setup.after_install"
 
+# Global Desk JS
+# --------------
+# Rewrites the raw Exotel <audio src="..."> that ERPNext's call_link
+# timeline template injects on any form with linked Call Logs, so the
+# browser never hits the Basic Auth challenge.
+app_include_js = "/assets/voice_ops/js/timeline_recording_proxy.js"
+
 # Doctype JS
 # ----------
 doctype_js = {
