@@ -58,7 +58,7 @@ def translate_to(text, language_code):
 	if language_code.startswith("en"):
 		return text
 
-	from voice_ops.services.summarizer import _get_anthropic_key
+	from voice_ops.services.summarizer import _get_anthropic_key, _get_model
 
 	api_key = _get_anthropic_key()
 	if not api_key:
@@ -80,7 +80,7 @@ def translate_to(text, language_code):
 	try:
 		client = anthropic.Anthropic(api_key=api_key)
 		message = client.messages.create(
-			model="claude-haiku-4-5-20251001",
+			model=_get_model(),
 			max_tokens=256,
 			messages=[{"role": "user", "content": prompt}],
 		)

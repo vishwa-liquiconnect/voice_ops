@@ -64,7 +64,7 @@ def _summarize_voicemail_with_claude(transcript, caller_info, api_key):
 	prompt += f"\nVoicemail transcript:\n{transcript}"
 
 	message = client.messages.create(
-		model="claude-haiku-4-5-20251001",
+		model=_get_model(),
 		max_tokens=256,
 		messages=[{"role": "user", "content": prompt}],
 	)
@@ -169,12 +169,28 @@ def _summarize_voicemail_digest_with_claude(voicemails, api_key):
 	)
 
 	message = client.messages.create(
-		model="claude-haiku-4-5-20251001",
+		model=_get_model(),
 		max_tokens=512,
 		system=_cached_system(system_prompt),
 		messages=[{"role": "user", "content": user_prompt}],
 	)
 	return message.content[0].text.strip()
+
+
+_FALLBACK_MODEL = "claude-haiku-4-5-20251001"
+
+
+def _get_model():
+	"""Return the Claude model ID configured on FMS AI Settings.
+
+	Falls back to Haiku when the setting is missing or FMS AI Settings
+	isn't available on this bench."""
+	try:
+		value = frappe.db.get_single_value("FMS AI Settings", "default_model") or ""
+	except Exception:
+		return _FALLBACK_MODEL
+	value = value.strip()
+	return value or _FALLBACK_MODEL
 
 
 def _cached_system(system_prompt):
@@ -266,7 +282,7 @@ def _generate_issue_payload_with_claude(call_log_info, summary, api_key):
 	)
 
 	message = client.messages.create(
-		model="claude-haiku-4-5-20251001",
+		model=_get_model(),
 		max_tokens=512,
 		system=_cached_system(system_prompt),
 		messages=[{"role": "user", "content": user_prompt}],
@@ -358,7 +374,7 @@ def _summarize_with_claude(transcript, caller_name, bus_info, api_key):
 	prompt += f"\nQuery transcript:\n{transcript}"
 
 	message = client.messages.create(
-		model="claude-haiku-4-5-20251001",
+		model=_get_model(),
 		max_tokens=256,
 		messages=[{"role": "user", "content": prompt}],
 	)
