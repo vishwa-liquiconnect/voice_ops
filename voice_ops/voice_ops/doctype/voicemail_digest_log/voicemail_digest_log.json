@@ -1,0 +1,169 @@
+{
+	"doctype": "DocType",
+	"name": "Voicemail Digest Log",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"autoname": "format:VMD-{YYYY}-{MM}-{DD}-{####}",
+	"title_field": "subject",
+	"sort_field": "creation",
+	"sort_order": "DESC",
+	"field_order": [
+		"sb_window",
+		"window_start",
+		"window_end",
+		"cb_window",
+		"triggered_by",
+		"status",
+		"sent_at",
+		"sb_content",
+		"subject",
+		"voicemail_count",
+		"overall_summary",
+		"sb_delivery",
+		"channel",
+		"email_recipients",
+		"cb_delivery",
+		"whatsapp_recipients",
+		"sb_voicemails",
+		"voicemails",
+		"sb_body",
+		"message_body"
+	],
+	"fields": [
+		{
+			"fieldname": "sb_window",
+			"fieldtype": "Section Break",
+			"label": "Window"
+		},
+		{
+			"fieldname": "window_start",
+			"fieldtype": "Datetime",
+			"label": "Window Start",
+			"reqd": 1
+		},
+		{
+			"fieldname": "window_end",
+			"fieldtype": "Datetime",
+			"label": "Window End",
+			"reqd": 1
+		},
+		{
+			"fieldname": "cb_window",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "triggered_by",
+			"fieldtype": "Select",
+			"label": "Triggered By",
+			"options": "Manual\nScheduled",
+			"default": "Manual",
+			"reqd": 1,
+			"read_only_depends_on": "eval:!doc.__islocal && doc.status==\"Sent\""
+		},
+		{
+			"fieldname": "status",
+			"fieldtype": "Select",
+			"label": "Status",
+			"options": "Draft\nGenerated\nSent\nFailed",
+			"default": "Draft",
+			"read_only": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "sent_at",
+			"fieldtype": "Datetime",
+			"label": "Sent At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "sb_content",
+			"fieldtype": "Section Break",
+			"label": "Content"
+		},
+		{
+			"fieldname": "subject",
+			"fieldtype": "Data",
+			"label": "Subject",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "voicemail_count",
+			"fieldtype": "Int",
+			"label": "Voicemail Count",
+			"read_only": 1,
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "overall_summary",
+			"fieldtype": "Long Text",
+			"label": "Overall Summary"
+		},
+		{
+			"fieldname": "sb_delivery",
+			"fieldtype": "Section Break",
+			"label": "Delivery"
+		},
+		{
+			"fieldname": "channel",
+			"fieldtype": "Select",
+			"label": "Channel",
+			"options": "Email\nWhatsApp\nBoth",
+			"default": "Email",
+			"reqd": 1
+		},
+		{
+			"fieldname": "email_recipients",
+			"fieldtype": "Small Text",
+			"label": "Email Recipients",
+			"description": "Comma-separated email addresses."
+		},
+		{
+			"fieldname": "cb_delivery",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "whatsapp_recipients",
+			"fieldtype": "Small Text",
+			"label": "WhatsApp Recipients",
+			"description": "Comma-separated phone numbers with country code (e.g. +919876543210)."
+		},
+		{
+			"fieldname": "sb_voicemails",
+			"fieldtype": "Section Break",
+			"label": "Voicemails"
+		},
+		{
+			"fieldname": "voicemails",
+			"fieldtype": "Table",
+			"label": "Voicemails",
+			"options": "Voicemail Digest Entry"
+		},
+		{
+			"fieldname": "sb_body",
+			"fieldtype": "Section Break",
+			"label": "Rendered Message",
+			"collapsible": 1
+		},
+		{
+			"fieldname": "message_body",
+			"fieldtype": "Text Editor",
+			"label": "Message Body (HTML)"
+		}
+	],
+	"permissions": [
+		{
+			"role": "System Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1,
+			"delete": 1
+		},
+		{
+			"role": "Fleet Manager",
+			"create": 1,
+			"read": 1,
+			"write": 1
+		}
+	],
+	"track_changes": 1
+}

@@ -1,0 +1,59 @@
+{
+	"doctype": "DocType",
+	"name": "Voicemail Digest Entry",
+	"module": "Voice Ops",
+	"istable": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"call_log",
+		"caller_name",
+		"mobile",
+		"designation",
+		"vehicle",
+		"call_time",
+		"transcript"
+	],
+	"fields": [
+		{
+			"fieldname": "call_log",
+			"fieldtype": "Link",
+			"label": "Call Log",
+			"options": "Call Log",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "caller_name",
+			"fieldtype": "Data",
+			"label": "Name",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "mobile",
+			"fieldtype": "Data",
+			"label": "Mobile",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "designation",
+			"fieldtype": "Data",
+			"label": "Designation"
+		},
+		{
+			"fieldname": "vehicle",
+			"fieldtype": "Data",
+			"label": "Vehicle",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "call_time",
+			"fieldtype": "Datetime",
+			"label": "Call Time",
+			"in_list_view": 1
+		},
+		{
+			"fieldname": "transcript",
+			"fieldtype": "Small Text",
+			"label": "Transcript"
+		}
+	]
+}
