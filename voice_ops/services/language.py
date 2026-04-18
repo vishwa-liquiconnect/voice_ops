@@ -58,7 +58,10 @@ def translate_to(text, language_code):
 	if language_code.startswith("en"):
 		return text
 
-	from voice_ops.services.summarizer import _get_anthropic_key, _get_model
+	from voice_ops.services.summarizer import _get_anthropic_key, _get_model, fms_ai_available
+
+	if not fms_ai_available():
+		return text
 
 	api_key = _get_anthropic_key()
 	if not api_key:

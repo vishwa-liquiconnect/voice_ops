@@ -11,6 +11,23 @@ import re
 import frappe
 
 
+def fms_ai_available():
+	"""Whether the fms_ai app is installed on this bench.
+
+	Single gate for every Claude-driven transformation in voice_ops
+	(voicemail/query summarization, issue generation, translation).
+	When fms_ai is absent the telephony flow still works — recordings
+	are captured, transcribed via Sarvam, and stored raw — but AI
+	decoration and downstream artefacts (Issues, ack WhatsApps) are
+	skipped. Intentional: the system prompt, model and context all
+	live in fms_ai; without it there's no sensible AI to invoke.
+	"""
+	try:
+		return "fms_ai" in frappe.get_installed_apps()
+	except Exception:
+		return False
+
+
 def has_anthropic_key():
 	"""Return True if an Anthropic API key is configured in Voice Ops Settings."""
 	return bool(_get_anthropic_key())
@@ -32,6 +49,9 @@ def summarize_voicemail(transcript, caller_info=None):
 	"""
 	if not transcript or not transcript.strip():
 		return ""
+
+	if not fms_ai_available():
+		return transcript.strip()
 
 	api_key = _get_anthropic_key()
 	if not api_key:
@@ -81,6 +101,9 @@ def summarize_voicemail_digest(voicemails):
 	the overall-summary section.
 	"""
 	if not voicemails:
+		return ""
+
+	if not fms_ai_available():
 		return ""
 
 	api_key = _get_anthropic_key()
@@ -222,6 +245,9 @@ def generate_issue_payload(call_log_info, summary):
 	if not summary or not summary.strip():
 		return None
 
+	if not fms_ai_available():
+		return None
+
 	api_key = _get_anthropic_key()
 	if not api_key:
 		return None
@@ -328,6 +354,9 @@ def summarize_query(query_transcript, caller_name=None, bus_info=None):
 	"""
 	if not query_transcript or not query_transcript.strip():
 		return "No query recorded."
+
+	if not fms_ai_available():
+		return _extractive_summary(query_transcript)
 
 	# Try Claude API first
 	api_key = _get_anthropic_key()
