@@ -171,10 +171,26 @@ def _summarize_voicemail_digest_with_claude(voicemails, api_key):
 	message = client.messages.create(
 		model="claude-haiku-4-5-20251001",
 		max_tokens=512,
-		system=system_prompt,
+		system=_cached_system(system_prompt),
 		messages=[{"role": "user", "content": user_prompt}],
 	)
 	return message.content[0].text.strip()
+
+
+def _cached_system(system_prompt):
+	"""Wrap the system prompt as a cacheable content block.
+
+	The FMS AI Settings prompt is ~4.7k static tokens shared across every
+	digest / issue call. Using `cache_control: ephemeral` drops cached-input
+	cost to 10% of base. Short prompts below Anthropic's minimum simply
+	won't cache (no harm)."""
+	return [
+		{
+			"type": "text",
+			"text": system_prompt,
+			"cache_control": {"type": "ephemeral"},
+		}
+	]
 
 
 def generate_issue_payload(call_log_info, summary):
@@ -252,7 +268,7 @@ def _generate_issue_payload_with_claude(call_log_info, summary, api_key):
 	message = client.messages.create(
 		model="claude-haiku-4-5-20251001",
 		max_tokens=512,
-		system=system_prompt,
+		system=_cached_system(system_prompt),
 		messages=[{"role": "user", "content": user_prompt}],
 	)
 	text = _strip_code_fences((message.content[0].text or "").strip())
