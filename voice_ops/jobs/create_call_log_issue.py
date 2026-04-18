@@ -63,9 +63,18 @@ def run(call_log_name):
 	}
 	if priority:
 		doc["priority"] = priority
-	raised_by = call_log.get("from")
-	if raised_by:
-		doc["raised_by"] = raised_by
+
+	contact_id = call_log.get("caller_contact")
+	if contact_id and frappe.db.exists("Contact", contact_id):
+		doc["contact"] = contact_id
+
+	vehicle_id = call_log.get("caller_vehicle_id")
+	if level == "Vehicle" and vehicle_id and frappe.db.exists("Vehicle", vehicle_id):
+		doc["custom_vehicle"] = vehicle_id
+
+	company = _resolve_company()
+	if company:
+		doc["company"] = company
 
 	try:
 		issue = frappe.get_doc(doc)
@@ -118,3 +127,25 @@ def _enrich_caller(call_log):
 	call_log["caller_name"] = info.get("name") or ""
 	call_log["caller_designation"] = info.get("designation") or ""
 	call_log["caller_vehicle"] = info.get("vehicle_label") or ""
+	call_log["caller_contact"] = info.get("contact") or ""
+	call_log["caller_vehicle_id"] = info.get("vehicle") or ""
+
+
+def _resolve_company():
+	"""Pick a Company doc name to link on the Issue.
+
+	Preference order: FMS AI Settings' `company_name` if it resolves to
+	an existing Company doc, otherwise the ERPNext default company.
+	Returns None when nothing matches.
+	"""
+	try:
+		candidate = frappe.db.get_single_value("FMS AI Settings", "company_name") or ""
+	except Exception:
+		candidate = ""
+	candidate = candidate.strip()
+	if candidate and frappe.db.exists("Company", candidate):
+		return candidate
+	try:
+		return frappe.defaults.get_global_default("company")
+	except Exception:
+		return None
