@@ -272,15 +272,31 @@ def resolve_route_manager(employee):
 	info = frappe.db.get_value(
 		"Employee",
 		rm_employee,
-		["employee_name", "custom_mobile_number", "cell_number"],
+		[
+			"employee_name",
+			"custom_mobile_number",
+			"cell_number",
+			"company_email",
+			"user_id",
+			"personal_email",
+		],
 		as_dict=True,
 	) or {}
 
 	phone = (info.get("custom_mobile_number") or info.get("cell_number") or "").strip()
+
+	email = ""
+	for key in ("company_email", "user_id", "personal_email"):
+		value = (info.get(key) or "").strip()
+		if value and "@" in value:
+			email = value
+			break
+
 	return {
 		"employee": rm_employee,
 		"name": info.get("employee_name") or rm_employee,
 		"phone": phone,
+		"email": email,
 	}
 
 

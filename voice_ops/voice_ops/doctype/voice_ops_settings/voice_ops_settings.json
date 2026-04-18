@@ -77,8 +77,8 @@
 		"voicemail_digest_phone",
 		"last_voicemail_digest_sent",
 		"issue_ack_section",
-		"enable_route_manager_whatsapp",
-		"enable_driver_ack_whatsapp",
+		"enable_route_manager_alert",
+		"enable_driver_ack",
 		"column_break_issue_ack",
 		"default_driver_language"
 	],
@@ -489,16 +489,16 @@
 			"label": "Issue Acknowledgements"
 		},
 		{
-			"fieldname": "enable_route_manager_whatsapp",
+			"fieldname": "enable_route_manager_alert",
 			"fieldtype": "Check",
-			"label": "Notify Route Manager on Issue (WhatsApp)",
-			"description": "WhatsApp the operations_incharge resolved from the caller's most recent Trip Roster Assignment."
+			"label": "Email Route Manager on Issue",
+			"description": "Email the operations_incharge resolved from the caller's most recent Trip Roster Assignment. Silent when that person has no email on their Employee record."
 		},
 		{
-			"fieldname": "enable_driver_ack_whatsapp",
+			"fieldname": "enable_driver_ack",
 			"fieldtype": "Check",
-			"label": "Acknowledge Driver on Issue (WhatsApp)",
-			"description": "WhatsApp the caller in their detected language confirming the issue was logged."
+			"label": "Acknowledge Driver on Issue (Email)",
+			"description": "Email the caller confirming the issue was logged. Silent when no email is resolvable from Contact / Employee records."
 		},
 		{
 			"fieldname": "column_break_issue_ack",
