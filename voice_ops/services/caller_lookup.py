@@ -105,21 +105,28 @@ def _primary_contact_email(contact):
 	return ""
 
 
+_EMPLOYEE_EMAIL_FIELDS = (
+	"custom_email_id",
+	"company_email",
+	"user_id",
+	"personal_email",
+)
+
+
 def _employee_email(employee):
-	"""Prefer company_email, then user_id, then personal_email."""
+	"""Preference: custom_email_id → company_email → user_id → personal_email.
+
+	Each lookup is wrapped because `custom_email_id` is a per-bench
+	custom field — querying it on a bench that doesn't have it would
+	raise instead of returning None.
+	"""
 	if not employee:
 		return ""
-	try:
-		row = frappe.db.get_value(
-			"Employee",
-			employee,
-			["company_email", "user_id", "personal_email"],
-			as_dict=True,
-		) or {}
-	except Exception:
-		return ""
-	for key in ("company_email", "user_id", "personal_email"):
-		value = (row.get(key) or "").strip()
+	for field in _EMPLOYEE_EMAIL_FIELDS:
+		try:
+			value = (frappe.db.get_value("Employee", employee, field) or "").strip()
+		except Exception:
+			continue
 		if value and "@" in value:
 			return value
 	return ""
@@ -207,18 +214,14 @@ def read_call_log_context(call_log_name):
 		emp = frappe.db.get_value(
 			"Employee",
 			employee_id,
-			["employee_name", "designation", "company_email", "user_id", "personal_email"],
+			["employee_name", "designation"],
 			as_dict=True,
 		) or {}
 		if not name:
 			name = (emp.get("employee_name") or "").strip()
 		designation = (emp.get("designation") or "").strip()
 		if not email:
-			for key in ("company_email", "user_id", "personal_email"):
-				value = (emp.get(key) or "").strip()
-				if value and "@" in value:
-					email = value
-					break
+			email = _employee_email(employee_id)
 
 	if vehicle_id:
 		vehicle_label = frappe.db.get_value("Vehicle", vehicle_id, "license_plate") or vehicle_id
@@ -269,32 +272,23 @@ def resolve_route_manager(employee):
 		return None
 
 	rm_employee = rows[0].operations_incharge
-	info = frappe.db.get_value(
-		"Employee",
-		rm_employee,
-		[
-			"employee_name",
-			"custom_mobile_number",
-			"cell_number",
-			"company_email",
-			"user_id",
-			"personal_email",
-		],
-		as_dict=True,
-	) or {}
 
-	phone = (info.get("custom_mobile_number") or info.get("cell_number") or "").strip()
-
-	email = ""
-	for key in ("company_email", "user_id", "personal_email"):
-		value = (info.get(key) or "").strip()
-		if value and "@" in value:
-			email = value
+	name = frappe.db.get_value("Employee", rm_employee, "employee_name") or rm_employee
+	phone = ""
+	for field in ("custom_mobile_number", "cell_number"):
+		try:
+			value = (frappe.db.get_value("Employee", rm_employee, field) or "").strip()
+		except Exception:
+			continue
+		if value:
+			phone = value
 			break
+
+	email = _employee_email(rm_employee)
 
 	return {
 		"employee": rm_employee,
-		"name": info.get("employee_name") or rm_employee,
+		"name": name,
 		"phone": phone,
 		"email": email,
 	}
