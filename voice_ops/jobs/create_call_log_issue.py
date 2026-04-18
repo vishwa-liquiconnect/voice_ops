@@ -72,7 +72,7 @@ def run(call_log_name):
 	if email and "@" in email:
 		doc["raised_by"] = email
 
-	vehicle_id = call_log.get("caller_vehicle_id")
+	vehicle_id = _resolve_vehicle_from_hint(payload.get("vehicle_hint")) or call_log.get("caller_vehicle_id")
 	if level == "Vehicle" and vehicle_id and frappe.db.exists("Vehicle", vehicle_id):
 		doc["custom_vehicle"] = vehicle_id
 
@@ -111,6 +111,46 @@ def _resolve_priority(raw):
 
 def _fallback_priority():
 	return PRIORITY_FALLBACK if frappe.db.exists("Issue Priority", PRIORITY_FALLBACK) else None
+
+
+def _resolve_vehicle_from_hint(hint):
+	"""Map Claude's transcript hint (e.g. '2833' or 'TN02BY2234') to a
+	Vehicle doc name. Vehicles are named by license_plate, so we try:
+	  1. exact match on the hint
+	  2. exact match on the digits-only tail
+	  3. license_plate ending with the digit tail (unique match only)
+	  4. license_plate containing the digit tail (unique match only)
+	Returns None when we can't pin down a single vehicle — better to
+	fall back to the caller's assigned vehicle than link the wrong bus.
+	"""
+	if not hint:
+		return None
+	candidate = str(hint).strip().upper()
+	if not candidate:
+		return None
+
+	if frappe.db.exists("Vehicle", candidate):
+		return candidate
+
+	digits = "".join(ch for ch in candidate if ch.isdigit())
+	if not digits:
+		return None
+
+	if frappe.db.exists("Vehicle", digits):
+		return digits
+
+	for pattern in (f"%{digits}", f"%{digits}%"):
+		rows = frappe.db.get_all(
+			"Vehicle",
+			filters={"license_plate": ("like", pattern)},
+			pluck="name",
+			limit=2,
+		)
+		if len(rows) == 1:
+			return rows[0]
+		if len(rows) > 1:
+			return None
+	return None
 
 
 def _resolve_level(raw):
