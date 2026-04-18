@@ -75,7 +75,12 @@
 		"voicemail_digest_channel",
 		"voicemail_digest_email",
 		"voicemail_digest_phone",
-		"last_voicemail_digest_sent"
+		"last_voicemail_digest_sent",
+		"issue_ack_section",
+		"enable_route_manager_whatsapp",
+		"enable_driver_ack_whatsapp",
+		"column_break_issue_ack",
+		"default_driver_language"
 	],
 	"fields": [
 		{
@@ -477,6 +482,34 @@
 			"label": "Last Digest Sent",
 			"read_only": 1,
 			"hidden": 1
+		},
+		{
+			"fieldname": "issue_ack_section",
+			"fieldtype": "Section Break",
+			"label": "Issue Acknowledgements"
+		},
+		{
+			"fieldname": "enable_route_manager_whatsapp",
+			"fieldtype": "Check",
+			"label": "Notify Route Manager on Issue (WhatsApp)",
+			"description": "WhatsApp the operations_incharge resolved from the caller's most recent Trip Roster Assignment."
+		},
+		{
+			"fieldname": "enable_driver_ack_whatsapp",
+			"fieldtype": "Check",
+			"label": "Acknowledge Driver on Issue (WhatsApp)",
+			"description": "WhatsApp the caller in their detected language confirming the issue was logged."
+		},
+		{
+			"fieldname": "column_break_issue_ack",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "default_driver_language",
+			"fieldtype": "Data",
+			"label": "Default Driver Language",
+			"description": "Fallback BCP-47 code when Sarvam detection is unavailable (e.g. hi-IN, ta-IN, te-IN, kn-IN, en-IN).",
+			"default": "en-IN"
 		}
 	],
 	"permissions": [

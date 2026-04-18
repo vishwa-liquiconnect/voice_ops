@@ -163,6 +163,56 @@ def _lookup_trip_crew_member(norm):
 	return (row.employee_name or row.employee, row.employee)
 
 
+def resolve_route_manager(employee):
+	"""Return `{employee, name, phone}` for the operations_incharge on
+	the employee's most recent Trip Roster Assignment, or None.
+
+	The roster stores `operations_incharge` as an Employee link; we
+	resolve that to a human-readable name and a WhatsApp-capable phone
+	(custom_mobile_number first, then cell_number).
+	"""
+	if not employee:
+		return None
+
+	crew = frappe.db.get_all(
+		"Trip Crew Member",
+		filters={"employee": employee},
+		pluck="name",
+	)
+	if not crew:
+		return None
+
+	rows = frappe.db.sql(
+		"""
+		SELECT operations_incharge
+		FROM `tabTrip Roster Assignment`
+		WHERE (driver_1 IN %(crew)s OR driver_2 IN %(crew)s)
+		  AND operations_incharge IS NOT NULL AND operations_incharge != ''
+		ORDER BY date DESC
+		LIMIT 1
+		""",
+		{"crew": tuple(crew)},
+		as_dict=True,
+	)
+	if not rows:
+		return None
+
+	rm_employee = rows[0].operations_incharge
+	info = frappe.db.get_value(
+		"Employee",
+		rm_employee,
+		["employee_name", "custom_mobile_number", "cell_number"],
+		as_dict=True,
+	) or {}
+
+	phone = (info.get("custom_mobile_number") or info.get("cell_number") or "").strip()
+	return {
+		"employee": rm_employee,
+		"name": info.get("employee_name") or rm_employee,
+		"phone": phone,
+	}
+
+
 def _most_recent_vehicle(employee):
 	"""Scan every Trip Roster Assignment this employee appears on and
 	return `(vehicle_doc_name, license_plate)` from the most recent one.

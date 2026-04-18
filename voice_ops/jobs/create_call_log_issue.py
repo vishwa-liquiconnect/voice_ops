@@ -25,7 +25,7 @@ def run(call_log_name):
 	call_log = frappe.db.get_value(
 		"Call Log",
 		call_log_name,
-		["name", "summary", "from", "to", "type_of_call", "duration"],
+		["name", "summary", "from", "to", "type_of_call", "duration", "custom_detected_language"],
 		as_dict=True,
 	)
 	summary = (call_log.summary or "").strip() if call_log else ""
@@ -89,6 +89,31 @@ def run(call_log_name):
 			frappe.get_traceback(),
 			f"Voice Ops: Issue creation failed for {call_log_name}",
 		)
+		return
+
+	_dispatch_acks(issue.name, call_log)
+
+
+def _dispatch_acks(issue_name, call_log):
+	"""Fire the route-manager and driver WhatsApp acks. Best-effort;
+	individual failures are swallowed inside each sender."""
+	employee = call_log.get("caller_employee")
+	route_manager = None
+	if employee:
+		try:
+			from voice_ops.services.caller_lookup import resolve_route_manager
+
+			route_manager = resolve_route_manager(employee)
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Voice Ops: route manager lookup failed for {issue_name}",
+			)
+
+	from voice_ops.services.ack_sender import send_driver_ack, send_route_manager_alert
+
+	send_route_manager_alert(issue_name, call_log, route_manager)
+	send_driver_ack(issue_name, call_log)
 
 
 def _issue_already_created(call_log_name):
@@ -174,6 +199,7 @@ def _enrich_caller(call_log):
 	call_log["caller_contact"] = info.get("contact") or ""
 	call_log["caller_vehicle_id"] = info.get("vehicle") or ""
 	call_log["caller_email"] = info.get("email") or ""
+	call_log["caller_employee"] = info.get("employee") or ""
 
 
 def _resolve_company():
