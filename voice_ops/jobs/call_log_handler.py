@@ -108,11 +108,38 @@ def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
 		)
 		return
 
+	_attach_caller_links(call_log_name)
+
 	frappe.enqueue(
 		"voice_ops.jobs.create_call_log_issue.run",
 		queue="long",
 		call_log_name=call_log_name,
 	)
+
+
+def _attach_caller_links(call_log_name):
+	"""Resolve the caller once at transcription time and attach Contact
+	/ Employee / Vehicle rows to `Call Log.links`. Downstream consumers
+	read from the links instead of re-resolving."""
+	try:
+		from voice_ops.services.caller_lookup import resolve_caller
+		from voice_ops.services.call_log_links import add_call_log_links
+
+		from_phone = frappe.db.get_value("Call Log", call_log_name, "from")
+		info = resolve_caller(from_phone) or {}
+		add_call_log_links(
+			call_log_name,
+			[
+				("Contact", info.get("contact")),
+				("Employee", info.get("employee")),
+				("Vehicle", info.get("vehicle")),
+			],
+		)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: caller link attach failed for {call_log_name}",
+		)
 
 
 def on_exotel_call_log_update(doc, method):

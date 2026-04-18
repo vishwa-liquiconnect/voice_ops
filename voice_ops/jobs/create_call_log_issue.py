@@ -91,6 +91,16 @@ def run(call_log_name):
 		)
 		return
 
+	try:
+		from voice_ops.services.call_log_links import add_call_log_links
+
+		add_call_log_links(call_log_name, [("Issue", issue.name)])
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: failed to link Issue {issue.name} to Call Log {call_log_name}",
+		)
+
 	_dispatch_acks(issue.name, call_log)
 
 
@@ -187,10 +197,13 @@ def _resolve_level(raw):
 
 
 def _enrich_caller(call_log):
+	info = {}
 	try:
-		from voice_ops.services.caller_lookup import resolve_caller
+		from voice_ops.services.caller_lookup import read_call_log_context, resolve_caller
 
-		info = resolve_caller(call_log.get("from")) or {}
+		info = read_call_log_context(call_log.get("name")) or {}
+		if not (info.get("employee") or info.get("contact") or info.get("vehicle")):
+			info = resolve_caller(call_log.get("from")) or {}
 	except Exception:
 		info = {}
 	call_log["caller_name"] = info.get("name") or ""

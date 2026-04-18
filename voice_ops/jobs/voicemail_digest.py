@@ -75,17 +75,22 @@ def _fetch_voicemails(since_dt):
 
 
 def _enrich_callers(voicemails):
-	"""Attach `caller_name` and `caller_vehicle` to each voicemail dict by
-	resolving the `from` number against Contact / Employee / Trip Roster.
+	"""Attach `caller_name` / `caller_designation` / `caller_vehicle` to
+	each voicemail dict. Prefers the links already written to
+	`Call Log.links` at transcription time; falls back to a live
+	`resolve_caller` for legacy rows whose links are empty.
 
 	Swallows per-voicemail lookup errors so a single bad row (e.g. a
 	missing doctype on an unusual bench) doesn't abort the whole digest.
 	"""
-	from voice_ops.services.caller_lookup import resolve_caller
+	from voice_ops.services.caller_lookup import read_call_log_context, resolve_caller
 
 	for vm in voicemails:
+		info = None
 		try:
-			info = resolve_caller(vm.get("from"))
+			info = read_call_log_context(vm.get("name"))
+			if not info:
+				info = resolve_caller(vm.get("from"))
 		except Exception:
 			frappe.log_error(
 				frappe.get_traceback(),

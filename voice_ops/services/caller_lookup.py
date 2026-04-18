@@ -163,6 +163,77 @@ def _lookup_trip_crew_member(norm):
 	return (row.employee_name or row.employee, row.employee)
 
 
+def read_call_log_context(call_log_name):
+	"""Reconstruct caller context from `Call Log.links` (Contact / Employee
+	/ Vehicle) — same shape as `resolve_caller` so callers can swap.
+
+	Returns None when no relevant link rows exist, so the caller can
+	fall back to a live `resolve_caller` lookup for legacy Call Logs
+	whose links haven't been populated yet.
+	"""
+	if not call_log_name or not frappe.db.exists("Call Log", call_log_name):
+		return None
+
+	try:
+		doc = frappe.get_doc("Call Log", call_log_name)
+	except Exception:
+		return None
+
+	by_type = {}
+	for link in (doc.links or []):
+		by_type.setdefault(link.link_doctype, []).append(link.link_name)
+
+	contact_id = (by_type.get("Contact") or [None])[0]
+	employee_id = (by_type.get("Employee") or [None])[0]
+	vehicle_id = (by_type.get("Vehicle") or [None])[0]
+
+	if not (contact_id or employee_id or vehicle_id):
+		return None
+
+	name = ""
+	email = ""
+	designation = ""
+	vehicle_label = ""
+
+	if contact_id:
+		try:
+			contact = frappe.get_doc("Contact", contact_id)
+			name = (contact.full_name or contact.first_name or "").strip()
+			email = _primary_contact_email(contact)
+		except Exception:
+			contact_id = ""
+
+	if employee_id:
+		emp = frappe.db.get_value(
+			"Employee",
+			employee_id,
+			["employee_name", "designation", "company_email", "user_id", "personal_email"],
+			as_dict=True,
+		) or {}
+		if not name:
+			name = (emp.get("employee_name") or "").strip()
+		designation = (emp.get("designation") or "").strip()
+		if not email:
+			for key in ("company_email", "user_id", "personal_email"):
+				value = (emp.get(key) or "").strip()
+				if value and "@" in value:
+					email = value
+					break
+
+	if vehicle_id:
+		vehicle_label = frappe.db.get_value("Vehicle", vehicle_id, "license_plate") or vehicle_id
+
+	return {
+		"name": name,
+		"contact": contact_id or "",
+		"employee": employee_id or "",
+		"email": email,
+		"designation": designation,
+		"vehicle": vehicle_id or "",
+		"vehicle_label": vehicle_label,
+	}
+
+
 def resolve_route_manager(employee):
 	"""Return `{employee, name, phone}` for the operations_incharge on
 	the employee's most recent Trip Roster Assignment, or None.
