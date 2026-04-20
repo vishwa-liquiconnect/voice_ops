@@ -80,7 +80,14 @@
 		"enable_route_manager_alert",
 		"enable_driver_ack",
 		"column_break_issue_ack",
-		"default_driver_language"
+		"default_driver_language",
+		"exotel_whatsapp_ack_section",
+		"enable_exotel_whatsapp_ack",
+		"exotel_whatsapp_from",
+		"exotel_whatsapp_template_language",
+		"column_break_exotel_whatsapp_ack",
+		"exotel_whatsapp_template_driver_ack",
+		"exotel_whatsapp_template_route_manager_alert"
 	],
 	"fields": [
 		{
@@ -510,6 +517,52 @@
 			"label": "Default Driver Language",
 			"description": "Fallback BCP-47 code when Sarvam detection is unavailable (e.g. hi-IN, ta-IN, te-IN, kn-IN, en-IN).",
 			"default": "en-IN"
+		},
+		{
+			"fieldname": "exotel_whatsapp_ack_section",
+			"fieldtype": "Section Break",
+			"label": "Exotel WhatsApp Acks",
+			"description": "Send WhatsApp acknowledgements via Exotel's WhatsApp Business API in addition to email. Templates must be pre-approved in the Exotel dashboard."
+		},
+		{
+			"fieldname": "enable_exotel_whatsapp_ack",
+			"fieldtype": "Check",
+			"label": "Enable Exotel WhatsApp Acks",
+			"default": "0",
+			"description": "Send driver and route manager acks over WhatsApp via Exotel. Uses credentials from Exotel Settings."
+		},
+		{
+			"fieldname": "exotel_whatsapp_from",
+			"fieldtype": "Data",
+			"label": "Exotel WhatsApp Sender",
+			"depends_on": "eval:doc.enable_exotel_whatsapp_ack",
+			"description": "WhatsApp Business number registered with Exotel, in E.164 format (e.g. +919876543210)."
+		},
+		{
+			"fieldname": "exotel_whatsapp_template_language",
+			"fieldtype": "Data",
+			"label": "Template Language Code",
+			"default": "en",
+			"depends_on": "eval:doc.enable_exotel_whatsapp_ack",
+			"description": "Language code registered on the Exotel template (e.g. en, en_US, hi)."
+		},
+		{
+			"fieldname": "column_break_exotel_whatsapp_ack",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "exotel_whatsapp_template_driver_ack",
+			"fieldtype": "Data",
+			"label": "Driver Ack Template Name",
+			"depends_on": "eval:doc.enable_exotel_whatsapp_ack",
+			"description": "Pre-approved Exotel template for driver ack. Body parameters sent in order: {1} caller name, {2} issue name."
+		},
+		{
+			"fieldname": "exotel_whatsapp_template_route_manager_alert",
+			"fieldtype": "Data",
+			"label": "Route Manager Alert Template Name",
+			"depends_on": "eval:doc.enable_exotel_whatsapp_ack",
+			"description": "Pre-approved Exotel template for route manager alert. Body parameters sent in order: {1} manager name, {2} issue name, {3} priority, {4} caller + phone, {5} vehicle, {6} issue URL."
 		}
 	],
 	"permissions": [

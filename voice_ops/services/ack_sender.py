@@ -1,38 +1,38 @@
 """
-Post-Issue Acknowledgements (Email)
+Post-Issue Acknowledgements (Email + Exotel WhatsApp)
 
-After an Issue is created from a Call Log, fan out two emails:
+After an Issue is created from a Call Log, fan out two acks on each
+enabled channel:
 
 - Route manager — full context (ticket, priority, caller, vehicle,
   excerpt, CTA link). Sent to the `operations_incharge` on the
-  caller's most recent Trip Roster Assignment when that person has an
-  email on their Employee record.
-- Driver — short confirmation. Sent to the caller when we resolved
-  an email for them (Contact email → Employee company_email / user_id
-  / personal_email).
+  caller's most recent Trip Roster Assignment.
+- Driver — short confirmation. Sent to the caller.
 
-Silent when no email can be resolved — intentional for now. WhatsApp
-was in this flow earlier but Meta's Business restrictions require
-approved templates per language, which we'll add separately.
+Email and WhatsApp are independent, additive channels, each gated by
+its own toggle in Voice Ops Settings. Email uses the resolved address
+from Contact/Employee; WhatsApp uses Exotel's WhatsApp Business API
+with pre-approved templates (template names configured in Voice Ops
+Settings). Silent when the respective contact point cannot be resolved.
 
-Both sends are best-effort and log on failure; they never fail Issue
+All sends are best-effort and log on failure; they never fail Issue
 creation itself.
 """
 
 import frappe
 from frappe.utils import get_url
 
+from voice_ops.services.telephony import send_exotel_whatsapp
+
 
 def send_route_manager_alert(issue_name, call_log, route_manager):
-	"""Email the resolved route manager."""
+	"""Notify the resolved route manager over email and Exotel WhatsApp.
+	Each channel is gated independently and skipped silently when its
+	contact point cannot be resolved."""
 	settings = frappe.get_single("Voice Ops Settings")
 	if not getattr(settings, "enable_route_manager_alert", 0):
 		return
 	if not route_manager:
-		return
-
-	email = (route_manager.get("email") or "").strip()
-	if not email:
 		return
 
 	priority = frappe.db.get_value("Issue", issue_name, "priority") or "Medium"
@@ -48,37 +48,46 @@ def send_route_manager_alert(issue_name, call_log, route_manager):
 	url = get_url(f"/app/issue/{issue_name}")
 	company = _company_name()
 
-	subject = f"[{company}] New Issue {issue_name} · {priority}"
-	html = _render_route_manager_html(
-		company=company,
+	email = (route_manager.get("email") or "").strip()
+	if email:
+		subject = f"[{company}] New Issue {issue_name} · {priority}"
+		html = _render_route_manager_html(
+			company=company,
+			issue_name=issue_name,
+			issue_subject=subject_line,
+			priority=priority,
+			caller=caller,
+			phone=caller_phone,
+			vehicle=vehicle,
+			excerpt=excerpt,
+			url=url,
+			manager_name=route_manager.get("name") or "",
+		)
+		try:
+			frappe.sendmail(recipients=[email], subject=subject, message=html)
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Voice Ops: Route manager email failed for {issue_name}",
+			)
+
+	_send_route_manager_whatsapp(
 		issue_name=issue_name,
-		issue_subject=subject_line,
+		route_manager=route_manager,
 		priority=priority,
 		caller=caller,
-		phone=caller_phone,
+		caller_phone=caller_phone,
 		vehicle=vehicle,
-		excerpt=excerpt,
 		url=url,
-		manager_name=route_manager.get("name") or "",
 	)
-
-	try:
-		frappe.sendmail(recipients=[email], subject=subject, message=html)
-	except Exception:
-		frappe.log_error(
-			frappe.get_traceback(),
-			f"Voice Ops: Route manager email failed for {issue_name}",
-		)
 
 
 def send_driver_ack(issue_name, call_log):
-	"""Email the driver/caller confirming their voicemail was logged."""
+	"""Confirm to the caller that their voicemail was logged. Email and
+	Exotel WhatsApp are gated independently; each is skipped silently
+	when its contact point cannot be resolved."""
 	settings = frappe.get_single("Voice Ops Settings")
 	if not getattr(settings, "enable_driver_ack", 0):
-		return
-
-	email = (call_log.get("caller_email") or "").strip()
-	if not email:
 		return
 
 	caller = call_log.get("caller_name") or ""
@@ -86,22 +95,89 @@ def send_driver_ack(issue_name, call_log):
 	url = get_url(f"/app/issue/{issue_name}")
 	company = _company_name()
 
-	subject = f"[{company}] Voicemail received · {issue_name}"
-	html = _render_driver_ack_html(
-		company=company,
-		issue_name=issue_name,
-		issue_subject=subject_line,
-		caller=caller,
-		url=url,
-	)
+	email = (call_log.get("caller_email") or "").strip()
+	if email:
+		subject = f"[{company}] Voicemail received · {issue_name}"
+		html = _render_driver_ack_html(
+			company=company,
+			issue_name=issue_name,
+			issue_subject=subject_line,
+			caller=caller,
+			url=url,
+		)
+		try:
+			frappe.sendmail(recipients=[email], subject=subject, message=html)
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Voice Ops: Driver ack email failed for {issue_name}",
+			)
 
+	_send_driver_whatsapp(issue_name=issue_name, call_log=call_log, caller=caller)
+
+
+def _send_driver_whatsapp(*, issue_name, call_log, caller):
+	template = (frappe.db.get_single_value(
+		"Voice Ops Settings", "exotel_whatsapp_template_driver_ack"
+	) or "").strip()
+	if not template:
+		return
+
+	to_phone = _normalize_phone(call_log.get("from"))
+	if not to_phone:
+		return
+
+	params = [caller or "there", issue_name]
 	try:
-		frappe.sendmail(recipients=[email], subject=subject, message=html)
+		send_exotel_whatsapp(to_phone=to_phone, template_name=template, template_params=params)
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),
-			f"Voice Ops: Driver ack email failed for {issue_name}",
+			f"Voice Ops: Driver WhatsApp ack failed for {issue_name}",
 		)
+
+
+def _send_route_manager_whatsapp(
+	*, issue_name, route_manager, priority, caller, caller_phone, vehicle, url
+):
+	template = (frappe.db.get_single_value(
+		"Voice Ops Settings", "exotel_whatsapp_template_route_manager_alert"
+	) or "").strip()
+	if not template:
+		return
+
+	to_phone = _normalize_phone((route_manager or {}).get("phone"))
+	if not to_phone:
+		return
+
+	manager_name = (route_manager or {}).get("name") or "Team"
+	caller_display = f"{caller} · {caller_phone}" if caller_phone and caller_phone != "-" else caller
+	params = [manager_name, issue_name, priority, caller_display, vehicle, url]
+	try:
+		send_exotel_whatsapp(to_phone=to_phone, template_name=template, template_params=params)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: Route manager WhatsApp alert failed for {issue_name}",
+		)
+
+
+def _normalize_phone(raw):
+	"""Return a +E.164-ish string, or empty. Assumes IN default when the
+	number is a bare 10-digit local."""
+	value = (raw or "").strip().replace(" ", "").replace("-", "")
+	if not value:
+		return ""
+	if value.startswith("+"):
+		return value
+	digits = "".join(ch for ch in value if ch.isdigit())
+	if len(digits) == 10:
+		return f"+91{digits}"
+	if len(digits) == 12 and digits.startswith("91"):
+		return f"+{digits}"
+	if digits:
+		return f"+{digits}"
+	return ""
 
 
 def _company_name():

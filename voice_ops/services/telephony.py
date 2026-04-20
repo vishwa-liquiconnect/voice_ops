@@ -516,3 +516,107 @@ def send_whatsapp(to_phone, message_body):
 			message=f"Failed to send WhatsApp to {to_phone}: {e}",
 		)
 		return None
+
+
+def send_exotel_whatsapp(to_phone, template_name, template_params=None, language=None):
+	"""
+	Send a WhatsApp template message via Exotel's v2 Messages API.
+
+	Exotel requires pre-approved templates for transactional acks. Body
+	parameters are passed positionally and map to {{1}}, {{2}}, ... in
+	the approved template body.
+
+	Args:
+		to_phone: Recipient in E.164 format (e.g. +919876543210).
+		template_name: Pre-approved Exotel template name.
+		template_params: Iterable of positional body parameters (stringified).
+		language: Language code registered on the template (e.g. "en", "hi").
+			Falls back to Voice Ops Settings, then "en".
+
+	Returns:
+		Exotel message SID on success, None on failure.
+	"""
+	if not to_phone or not template_name:
+		return None
+
+	settings = frappe.get_single("Voice Ops Settings")
+	if not settings.enable_exotel_whatsapp_ack:
+		return None
+
+	from_number = (settings.exotel_whatsapp_from or "").strip()
+	if not from_number:
+		frappe.log_error(
+			"Exotel WhatsApp sender not configured in Voice Ops Settings",
+			"Voice Ops: Exotel WhatsApp Send Failed",
+		)
+		return None
+
+	lang_code = (language or settings.exotel_whatsapp_template_language or "en").strip()
+
+	exotel_settings = frappe.get_single("Exotel Settings")
+	account_sid = exotel_settings.account_sid
+	api_key = exotel_settings.api_key
+	api_token = exotel_settings.get_password("api_token")
+
+	if not (account_sid and api_key and api_token):
+		frappe.log_error(
+			"Exotel Settings missing account_sid / api_key / api_token",
+			"Voice Ops: Exotel WhatsApp Send Failed",
+		)
+		return None
+
+	components = []
+	params_list = list(template_params or [])
+	if params_list:
+		components.append({
+			"type": "body",
+			"parameters": [
+				{"type": "text", "text": "" if p is None else str(p)}
+				for p in params_list
+			],
+		})
+
+	payload = {
+		"whatsapp": {
+			"messages": [{
+				"from": from_number,
+				"to": to_phone,
+				"content": {
+					"type": "template",
+					"template": {
+						"name": template_name,
+						"language": {"policy": "deterministic", "code": lang_code},
+						"components": components,
+					},
+				},
+			}],
+		},
+	}
+
+	url = f"https://api.exotel.com/v2/accounts/{account_sid}/messages"
+
+	try:
+		response = requests.post(
+			url,
+			json=payload,
+			auth=(api_key, api_token),
+			timeout=30,
+		)
+		response.raise_for_status()
+		body = response.json() or {}
+		messages = (body.get("whatsapp") or {}).get("messages") or []
+		if messages:
+			return messages[0].get("sid") or messages[0].get("id")
+		return body.get("sid") or body.get("id")
+	except requests.exceptions.RequestException as e:
+		detail = ""
+		try:
+			if e.response is not None:
+				detail = f"\nResponse: {e.response.status_code} {e.response.text}"
+		except Exception:
+			pass
+		frappe.log_error(
+			title="Voice Ops: Exotel WhatsApp Send Failed",
+			message=f"Failed to send Exotel WhatsApp to {to_phone} (template={template_name}): {e}{detail}",
+		)
+		return None
