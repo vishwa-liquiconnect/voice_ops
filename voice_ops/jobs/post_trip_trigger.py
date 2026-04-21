@@ -109,13 +109,14 @@ def _create_and_trigger(assignment, template_name):
 	frappe.db.commit()
 
 	try:
-		call_log_name = initiate_call(
+		call = initiate_call(
 			to_number=assignment["driver_1_mobile_number"],
 			reference_doctype="Checklist Run",
 			reference_name=run.name,
 		)
 
-		run.call_log = call_log_name
+		run.call_log_doctype = call["doctype"]
+		run.call_log = call["name"]
 		run.status = "Call Initiated"
 		run.initiated_at = now_datetime()
 		run.save(ignore_permissions=True)

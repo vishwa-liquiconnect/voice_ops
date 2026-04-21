@@ -31,15 +31,16 @@ def trigger_checklist_call(checklist_run_name):
 		run.populate_responses_from_template()
 		run.save(ignore_permissions=True)
 
-	# Initiate the call via Twilio
-	call_log_name = initiate_call(
+	# Initiate the call via the configured provider
+	call = initiate_call(
 		to_number=run.mobile_number,
 		reference_doctype="Checklist Run",
 		reference_name=run.name,
 	)
 
 	# Link the Call Log to the Checklist Run
-	run.call_log = call_log_name
+	run.call_log_doctype = call["doctype"]
+	run.call_log = call["name"]
 	run.status = "Call Initiated"
 	run.initiated_at = now_datetime()
 	run.save(ignore_permissions=True)
@@ -47,7 +48,8 @@ def trigger_checklist_call(checklist_run_name):
 
 	return {
 		"checklist_run": run.name,
-		"call_log": call_log_name,
+		"call_log": call["name"],
+		"call_log_doctype": call["doctype"],
 		"status": "Call Initiated",
 	}
 

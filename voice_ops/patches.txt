@@ -9,3 +9,4 @@ voice_ops.patches.drop_call_log_transcript_field
 voice_ops.patches.add_call_log_detected_language
 voice_ops.patches.backfill_call_log_links
 voice_ops.patches.migrate_ack_toggle_fieldnames
+voice_ops.patches.backfill_checklist_run_call_log_doctype

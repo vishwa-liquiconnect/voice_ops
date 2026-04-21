@@ -24,6 +24,7 @@
 		"completed_at",
 		"evaluated_at",
 		"call_section",
+		"call_log_doctype",
 		"call_log",
 		"responses_section",
 		"responses",
@@ -144,10 +145,18 @@
 			"label": "Call"
 		},
 		{
-			"fieldname": "call_log",
+			"fieldname": "call_log_doctype",
 			"fieldtype": "Link",
+			"label": "Call Log DocType",
+			"options": "DocType",
+			"read_only": 1,
+			"hidden": 1
+		},
+		{
+			"fieldname": "call_log",
+			"fieldtype": "Dynamic Link",
 			"label": "Call Log",
-			"options": "Call Log",
+			"options": "call_log_doctype",
 			"read_only": 1
 		},
 		{
