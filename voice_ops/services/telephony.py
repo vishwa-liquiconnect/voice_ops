@@ -137,8 +137,6 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 			"Url": callback_url,
 			"Record": "true",
 			"StatusCallback": _get_exotel_status_callback_url(),
-			"StatusCallbackEvents[0]": "terminal",
-			"StatusCallbackEvents[1]": "answered",
 		},
 		timeout=30,
 	)
