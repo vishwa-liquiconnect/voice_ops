@@ -126,6 +126,7 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 	callback_url = force_https(callback_url)
 	exophone = _get_exophone()
 	caller_id = frappe.db.get_single_value("Voice Ops Settings", "exotel_caller_id") or exophone
+	to_number = _normalize_exotel_number(to_number)
 
 	response = requests.post(
 		endpoint,
@@ -141,7 +142,17 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 		},
 		timeout=30,
 	)
-	response.raise_for_status()
+	if not response.ok:
+		frappe.log_error(
+			title="Voice Ops: Exotel Call Initiation Failed",
+			message=(
+				f"Status: {response.status_code}\n"
+				f"Response: {response.text}\n"
+				f"From: {exophone} | To: {to_number} | CallerId: {caller_id}\n"
+				f"Url: {callback_url}"
+			),
+		)
+		frappe.throw(f"Exotel rejected call ({response.status_code}): {response.text}")
 
 	call_data = response.json().get("Call", {})
 	call_sid = call_data.get("Sid")
@@ -161,6 +172,22 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 		} if reference_doctype and reference_name else None,
 	)
 	return call_log.name
+
+
+def _normalize_exotel_number(number):
+	"""Strip spaces/dashes and ensure Exotel-accepted format (+91... or 0...)."""
+	if not number:
+		return number
+	cleaned = "".join(ch for ch in str(number) if ch.isdigit() or ch == "+")
+	if cleaned.startswith("+"):
+		return cleaned
+	if cleaned.startswith("91") and len(cleaned) == 12:
+		return "+" + cleaned
+	if cleaned.startswith("0") and len(cleaned) == 11:
+		return cleaned
+	if len(cleaned) == 10:
+		return "+91" + cleaned
+	return cleaned
 
 
 def _get_exophone():
