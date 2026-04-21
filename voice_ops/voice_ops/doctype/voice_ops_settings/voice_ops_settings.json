@@ -17,6 +17,7 @@
 		"exotel_exophone",
 		"column_break_exotel",
 		"exotel_caller_id",
+		"exotel_flow_app_id",
 
 		"tab_call_settings",
 		"trigger_section",
@@ -150,6 +151,12 @@
 			"fieldtype": "Data",
 			"label": "Caller ID",
 			"description": "Caller ID shown to the recipient. Usually same as exophone."
+		},
+		{
+			"fieldname": "exotel_flow_app_id",
+			"fieldtype": "Data",
+			"label": "Outbound Flow App ID",
+			"description": "Exotel App (Flow) ID for outbound Passthru (e.g. 1223268). If set, outbound uses App=<id>; otherwise falls back to dynamic Url passthru."
 		},
 		{
 			"fieldname": "tab_call_settings",

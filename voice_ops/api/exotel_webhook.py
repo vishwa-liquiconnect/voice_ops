@@ -64,6 +64,15 @@ def exoml_response():
 	try:
 		checklist_run_name = frappe.form_dict.get("checklist_run")
 
+		# App-flow passthru sends the checklist_run via CustomField (form data),
+		# not as a URL query param.
+		if not checklist_run_name:
+			custom_field = frappe.form_dict.get("CustomField") or ""
+			for part in custom_field.split("&"):
+				if part.startswith("checklist_run="):
+					checklist_run_name = part.split("=", 1)[1]
+					break
+
 		if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
 			return Response(
 				'<?xml version="1.0" encoding="UTF-8"?><Response>'

@@ -127,18 +127,25 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 	exophone = _get_exophone()
 	caller_id = frappe.db.get_single_value("Voice Ops Settings", "exotel_caller_id") or exophone
 	to_number = _normalize_exotel_number(to_number)
+	flow_app_id = (frappe.db.get_single_value("Voice Ops Settings", "exotel_flow_app_id") or "").strip()
 
-	response = requests.post(
-		endpoint,
-		data={
-			"From": exophone,
-			"To": to_number,
-			"CallerId": caller_id,
-			"Url": callback_url,
-			"Record": "true",
-		},
-		timeout=30,
-	)
+	payload = {
+		"From": exophone,
+		"To": to_number,
+		"CallerId": caller_id,
+		"Record": "true",
+	}
+	if flow_app_id:
+		# App flow: Exotel invokes the Passthru applet configured on the Flow,
+		# which has our ExoML endpoint baked in. CustomField is forwarded as
+		# form data so the handler knows which Checklist Run this is for.
+		payload["App"] = flow_app_id
+		if reference_name:
+			payload["CustomField"] = f"checklist_run={reference_name}"
+	else:
+		payload["Url"] = callback_url
+
+	response = requests.post(endpoint, data=payload, timeout=30)
 	if not response.ok:
 		frappe.log_error(
 			title="Voice Ops: Exotel Call Initiation Failed",
@@ -146,7 +153,7 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 				f"Status: {response.status_code}\n"
 				f"Response: {response.text}\n"
 				f"From: {exophone} | To: {to_number} | CallerId: {caller_id}\n"
-				f"Url: {callback_url}"
+				f"Payload: {payload}"
 			),
 		)
 		frappe.throw(f"Exotel rejected call ({response.status_code}): {response.text}")
