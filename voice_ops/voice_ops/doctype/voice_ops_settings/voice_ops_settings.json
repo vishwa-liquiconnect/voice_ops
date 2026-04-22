@@ -35,6 +35,12 @@
 		"column_break_post_trip",
 		"post_trip_buffer_minutes",
 
+		"tab_auto_call",
+		"auto_call_feedback_section",
+		"enable_feedback_auto_call",
+		"column_break_auto_call_feedback",
+		"feedback_buffer_minutes",
+
 		"tab_inbound",
 		"inbound_section",
 		"enable_inbound_calls",
@@ -250,6 +256,37 @@
 			"label": "Post-Trip Buffer (minutes after completion)",
 			"default": "30",
 			"description": "How many minutes after trip completion to allow triggering the post-trip call"
+		},
+		{
+			"fieldname": "tab_auto_call",
+			"fieldtype": "Tab Break",
+			"label": "Auto Call",
+			"depends_on": "eval:doc.enabled"
+		},
+		{
+			"fieldname": "auto_call_feedback_section",
+			"fieldtype": "Section Break",
+			"label": "Post-Trip Feedback",
+			"description": "Auto-trigger a feedback call to driver_1 a fixed number of minutes after the Trip Roster Assignment's scheduled departure time (from the linked Schedule Addition). Uses the feedback flow configured in the General tab."
+		},
+		{
+			"fieldname": "enable_feedback_auto_call",
+			"fieldtype": "Check",
+			"label": "Enable Feedback Auto Call",
+			"default": "0",
+			"description": "When on, the scheduler checks every 5 minutes and triggers one feedback call per eligible Trip Roster Assignment."
+		},
+		{
+			"fieldname": "column_break_auto_call_feedback",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "feedback_buffer_minutes",
+			"fieldtype": "Int",
+			"label": "Feedback Buffer (minutes after scheduled time)",
+			"default": "30",
+			"depends_on": "eval:doc.enable_feedback_auto_call",
+			"description": "Trigger the feedback call this many minutes after the scheduled departure time. E.g. 30 = call at 6:30pm for a 6:00pm departure."
 		},
 		{
 			"fieldname": "tab_inbound",

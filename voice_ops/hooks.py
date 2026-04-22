@@ -46,6 +46,7 @@ scheduler_events = {
 		"*/5 * * * *": [
 			"voice_ops.jobs.auto_trigger.check_and_trigger",
 			"voice_ops.jobs.post_trip_trigger.check_and_trigger_post_trip",
+			"voice_ops.jobs.feedback_trigger.check_and_trigger",
 			"voice_ops.jobs.retry_calls.process_pending_retries",
 			"voice_ops.jobs.voicemail_digest.check_and_send",
 		],
