@@ -2,17 +2,19 @@
 Auto-trigger Post-Trip Feedback Calls
 
 Scheduler job that runs every 5 minutes. Finds Trip Roster Assignments
-where the scheduled departure time was more than `feedback_buffer_minutes`
-ago and triggers a single feedback call to driver_1 via the Exotel
-feedback flow.
+whose trip has ended more than `feedback_buffer_minutes` ago and
+triggers a single feedback call to driver_1 via the Exotel feedback
+flow.
 
-Mirrors the time-based pattern used in auto_trigger.py (pre-departure)
-and post_trip_trigger.py (post-completion), but the trigger moment is
-`scheduled_departure + buffer` rather than tied to trip status.
+Trip end is derived from the linked Schedule Addition's
+`schedule_locations` child table — specifically the row whose
+`point_type = 'End'`. Day offset on that row (Day 1 / 2 / 3) handles
+multi-day trips. We widen the TRA date filter to the last 7 days so a
+trip that started on Monday but ends today still qualifies.
 
-Dedup: one feedback call per Trip Roster Assignment. Checked by looking
-for an existing Call Log with type_of_call = 'Feedback' linked to the
-TRA via Dynamic Link.
+Dedup: one feedback call per Trip Roster Assignment. Checked by
+looking for an existing Call Log with type_of_call = 'Feedback'
+linked to the TRA via Dynamic Link.
 """
 
 from datetime import datetime, timedelta
@@ -21,6 +23,11 @@ import frappe
 from frappe.utils import add_to_date, get_datetime, getdate, now_datetime, today
 
 from voice_ops.services.feedback_call import initiate_feedback_call
+
+
+# TRAs beyond this many days ago aren't considered — avoids scanning
+# the full history on every tick. Tune up for long-haul fleets.
+LOOKBACK_DAYS = 7
 
 
 def check_and_trigger():
@@ -32,10 +39,13 @@ def check_and_trigger():
 		return
 
 	settings = frappe.get_single("Voice Ops Settings")
-	buffer_minutes = settings.feedback_buffer_minutes or 30
+	buffer_minutes = settings.feedback_buffer_minutes
+	if buffer_minutes is None:
+		buffer_minutes = 30
 
 	now = now_datetime()
 	current_date = getdate(today())
+	from_date = add_to_date(current_date, days=-LOOKBACK_DAYS)
 
 	assignments = frappe.db.sql("""
 		SELECT
@@ -44,19 +54,19 @@ def check_and_trigger():
 			tra.driver_1,
 			tra.driver_1_mobile_number,
 			tra.status,
-			sa.select_timings
+			tra.schedule
 		FROM `tabTrip Roster Assignment` tra
-		INNER JOIN `tabSchedule Addition` sa ON tra.schedule = sa.name
 		WHERE
-			tra.date = %s
+			tra.date BETWEEN %s AND %s
 			AND tra.docstatus = 1
 			AND IFNULL(tra.status, '') != 'Cancelled'
 			AND tra.driver_1 IS NOT NULL
 			AND tra.driver_1 != ''
 			AND tra.driver_1_mobile_number IS NOT NULL
 			AND tra.driver_1_mobile_number != ''
-			AND sa.select_timings IS NOT NULL
-	""", (current_date,), as_dict=True)
+			AND tra.schedule IS NOT NULL
+			AND tra.schedule != ''
+	""", (from_date, current_date), as_dict=True)
 
 	for assignment in assignments:
 		try:
@@ -70,11 +80,11 @@ def check_and_trigger():
 
 def _process_assignment(assignment, buffer_minutes, now):
 	"""Trigger a feedback call for one assignment if eligible."""
-	departure_dt = _compute_departure_datetime(assignment)
-	if not departure_dt:
+	end_dt = _compute_trip_end_datetime(assignment["schedule"], assignment["date"])
+	if not end_dt:
 		return
 
-	trigger_time = add_to_date(departure_dt, minutes=buffer_minutes)
+	trigger_time = add_to_date(end_dt, minutes=buffer_minutes)
 	if now < trigger_time:
 		return
 
@@ -112,34 +122,67 @@ def _feedback_call_exists(tra_name):
 	return bool(rows)
 
 
-def _compute_departure_datetime(assignment):
-	"""Build a datetime from Trip Roster Assignment.date + Schedule Addition.select_timings."""
-	trip_date = assignment.get("date")
-	select_timings = assignment.get("select_timings")
-	if not trip_date or not select_timings:
+def _compute_trip_end_datetime(schedule_name, trip_date):
+	"""Return the absolute trip-end datetime from the Schedule Addition's
+	`schedule_locations` row where point_type = 'End'. Handles multi-day
+	trips via the row's Day offset. Returns None when the End row or its
+	time is missing."""
+	if not schedule_name or not trip_date:
+		return None
+
+	rows = frappe.db.sql("""
+		SELECT day, time
+		FROM `tabSchedule Locations`
+		WHERE parent = %s
+			AND parenttype = 'Schedule Addition'
+			AND parentfield = 'schedule_locations'
+			AND point_type = 'End'
+		ORDER BY idx DESC
+		LIMIT 1
+	""", (schedule_name,), as_dict=True)
+
+	if not rows:
+		return None
+
+	row = rows[0]
+	raw_time = row.get("time")
+	if raw_time is None:
 		return None
 
 	try:
-		if isinstance(select_timings, timedelta):
-			hours = int(select_timings.total_seconds() // 3600)
-			minutes = int((select_timings.total_seconds() % 3600) // 60)
+		if isinstance(raw_time, timedelta):
+			hours = int(raw_time.total_seconds() // 3600)
+			minutes = int((raw_time.total_seconds() % 3600) // 60)
 		else:
-			parts = str(select_timings).split(":")
+			parts = str(raw_time).split(":")
 			hours = int(parts[0])
 			minutes = int(parts[1]) if len(parts) > 1 else 0
 
-		departure_dt = datetime(
-			year=trip_date.year,
-			month=trip_date.month,
-			day=trip_date.day,
+		day_num = _parse_day(row.get("day"))
+		end_date = trip_date + timedelta(days=day_num - 1)
+		end_dt = datetime(
+			year=end_date.year,
+			month=end_date.month,
+			day=end_date.day,
 			hour=hours,
 			minute=minutes,
 		)
-		return get_datetime(departure_dt)
+		return get_datetime(end_dt)
 	except Exception:
 		frappe.log_error(
-			f"Voice Ops: Cannot compute departure for {assignment.get('name')}: "
-			f"date={trip_date}, timings={select_timings}",
-			"Voice Ops: Invalid Departure Time",
+			f"Voice Ops: Cannot compute trip end for schedule={schedule_name}, "
+			f"date={trip_date}, day={row.get('day')}, time={raw_time}",
+			"Voice Ops: Invalid Trip End Time",
 		)
 		return None
+
+
+def _parse_day(raw):
+	"""Return the day number from a 'Day N' string (default 1)."""
+	if not raw:
+		return 1
+	digits = "".join(ch for ch in str(raw) if ch.isdigit())
+	try:
+		return int(digits) if digits else 1
+	except Exception:
+		return 1
