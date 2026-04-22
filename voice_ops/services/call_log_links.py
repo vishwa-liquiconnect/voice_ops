@@ -17,39 +17,57 @@ def add_call_log_links(call_log_name, links):
 	that are missing, point to nonexistent targets, or already exist on
 	this Call Log are silently skipped. The Call Log is saved once at
 	the end — only if at least one new row was added.
+
+	Retries on TimestampMismatchError: the attach-recording hook now fans
+	out across after_insert + on_update so two enrichment jobs can race
+	to append links at the same time. On conflict we re-fetch the latest
+	doc and re-diff the missing links against its current state.
 	"""
 	if not call_log_name or not links:
 		return
 	if not frappe.db.exists("Call Log", call_log_name):
 		return
 
-	try:
-		doc = frappe.get_doc("Call Log", call_log_name)
-	except Exception:
-		return
+	from frappe.exceptions import TimestampMismatchError
 
-	existing = {(row.link_doctype, row.link_name) for row in (doc.links or [])}
-	added = False
+	for attempt in range(3):
+		try:
+			doc = frappe.get_doc("Call Log", call_log_name)
+		except Exception:
+			return
 
-	for link_doctype, link_name in links:
-		if not link_doctype or not link_name:
+		existing = {(row.link_doctype, row.link_name) for row in (doc.links or [])}
+		added = False
+
+		for link_doctype, link_name in links:
+			if not link_doctype or not link_name:
+				continue
+			key = (link_doctype, link_name)
+			if key in existing:
+				continue
+			if not frappe.db.exists(link_doctype, link_name):
+				continue
+			doc.append("links", {"link_doctype": link_doctype, "link_name": link_name})
+			existing.add(key)
+			added = True
+
+		if not added:
+			return
+
+		try:
+			doc.save(ignore_permissions=True)
+			return
+		except TimestampMismatchError:
+			if attempt == 2:
+				frappe.log_error(
+					frappe.get_traceback(),
+					f"Voice Ops: failed to update links on Call Log {call_log_name} after retries",
+				)
+				return
 			continue
-		key = (link_doctype, link_name)
-		if key in existing:
-			continue
-		if not frappe.db.exists(link_doctype, link_name):
-			continue
-		doc.append("links", {"link_doctype": link_doctype, "link_name": link_name})
-		existing.add(key)
-		added = True
-
-	if not added:
-		return
-
-	try:
-		doc.save(ignore_permissions=True)
-	except Exception:
-		frappe.log_error(
-			frappe.get_traceback(),
-			f"Voice Ops: failed to update links on Call Log {call_log_name}",
-		)
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Voice Ops: failed to update links on Call Log {call_log_name}",
+			)
+			return

@@ -51,13 +51,25 @@ def fix_exotel_null_status(doc, method):
 
 
 def attach_exotel_recording(doc, method):
-	"""Download Exotel recording and attach as a file so it's playable from ERPNext."""
+	"""Download Exotel recording and attach as a file so it's playable from ERPNext.
+
+	Dedup note: this hook fires on both after_insert and on_update so that
+	outbound calls — whose recording_url arrives via a later webhook — get
+	processed too. That means inbound voicemails, which hit both hooks in
+	quick succession, would otherwise enqueue two download jobs. The cache
+	key below serialises the enqueue across both firings within a 10-min
+	window.
+	"""
 	if not doc.recording_url or "exotel.com" not in doc.recording_url:
 		return
 
-	# Skip if already has an attached recording file
 	if frappe.db.exists("File", {"attached_to_doctype": "Call Log", "attached_to_name": doc.name, "file_name": ("like", "call_recording_%")}):
 		return
+
+	cache_key = f"voice_ops:recording_enqueued:{doc.name}"
+	if frappe.cache().get_value(cache_key):
+		return
+	frappe.cache().set_value(cache_key, 1, expires_in_sec=600)
 
 	frappe.enqueue(
 		"voice_ops.jobs.call_log_handler._download_and_attach_exotel_recording",

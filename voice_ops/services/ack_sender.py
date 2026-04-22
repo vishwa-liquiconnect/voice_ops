@@ -229,13 +229,16 @@ def _content_sid_from_template_name(template_name):
 
 def _normalize_phone(raw):
 	"""Return a +E.164-ish string, or empty. Assumes IN default when the
-	number is a bare 10-digit local."""
+	number is a bare 10-digit local. Strips the Indian trunk prefix 0 so
+	e.g. '06382741676' becomes '+916382741676' instead of '+06382741676'."""
 	value = (raw or "").strip().replace(" ", "").replace("-", "")
 	if not value:
 		return ""
 	if value.startswith("+"):
 		return value
 	digits = "".join(ch for ch in value if ch.isdigit())
+	if digits.startswith("0") and len(digits) == 11:
+		digits = digits[1:]
 	if len(digits) == 10:
 		return f"+91{digits}"
 	if len(digits) == 12 and digits.startswith("91"):

@@ -22,6 +22,16 @@ def run(call_log_name):
 	if not call_log_name or not frappe.db.exists("Call Log", call_log_name):
 		return
 
+	# Serialise Issue creation per Call Log. The upstream attach-recording
+	# hook dedupes the enqueue, but if two jobs slip through (worker
+	# restart, cache flush), this lock stops the second one before it
+	# inserts a duplicate Issue. 5 min is plenty — Claude + insert finish
+	# in seconds.
+	lock_key = f"voice_ops:issue_creation:{call_log_name}"
+	if frappe.cache().get_value(lock_key):
+		return
+	frappe.cache().set_value(lock_key, 1, expires_in_sec=300)
+
 	call_log = frappe.db.get_value(
 		"Call Log",
 		call_log_name,
