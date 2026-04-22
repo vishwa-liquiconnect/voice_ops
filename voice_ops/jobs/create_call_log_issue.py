@@ -53,12 +53,15 @@ def run(call_log_name):
 	if not payload:
 		return
 
-	# Outbound feedback calls: driver may have nothing to report, so only
-	# create the Issue when Claude confirms the transcript is actionable.
-	# Inbound voicemails always create an Issue — the use case is a driver
-	# calling in *because* they have a problem, so non-actionable is a
-	# near-zero case and we'd rather over-create than miss one.
-	if call_log.get("type_of_call") == "Feedback" and not payload.get("is_actionable"):
+	# Only create an Issue when Claude confirms the transcript is actionable.
+	# Originally we gated this on type_of_call='Feedback' only, trusting
+	# that voicemails = a caller reaching out with a problem. But Exotel's
+	# Voicemail applet also tags the recording side of outbound feedback
+	# calls as CallType=voicemail, which wrote the driver's "no issues,
+	# all good" feedback as a Voicemail Call Log and created spurious
+	# Issues. Applying the gate universally — routine status confirmations
+	# stay on the Call Log summary for audit without polluting Issues.
+	if not payload.get("is_actionable"):
 		return
 
 	subject = (payload.get("subject") or "").strip() or f"Call {call_log_name}"
