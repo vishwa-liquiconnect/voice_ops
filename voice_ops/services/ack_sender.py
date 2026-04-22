@@ -22,7 +22,7 @@ creation itself.
 import frappe
 from frappe.utils import get_url
 
-from voice_ops.services.telephony import send_exotel_whatsapp
+from voice_ops.services.telephony import send_twilio_whatsapp_template
 
 
 def send_route_manager_alert(issue_name, call_log, route_manager):
@@ -117,22 +117,23 @@ def send_driver_ack(issue_name, call_log):
 
 
 def _send_driver_whatsapp(*, issue_name, call_log, caller):
-	template_info = _resolve_driver_whatsapp_template(call_log)
-	if not template_info:
+	if not frappe.db.get_single_value("Voice Ops Settings", "enable_exotel_whatsapp_ack"):
 		return
-	template, language = template_info
+
+	content_sid = _resolve_driver_whatsapp_content_sid(call_log)
+	if not content_sid:
+		return
 
 	to_phone = _normalize_phone(call_log.get("from"))
 	if not to_phone:
 		return
 
-	params = [caller or "there", issue_name]
+	variables = {"1": caller or "there", "2": issue_name}
 	try:
-		send_exotel_whatsapp(
+		send_twilio_whatsapp_template(
 			to_phone=to_phone,
-			template_name=template,
-			template_params=params,
-			language=language,
+			content_sid=content_sid,
+			content_variables=variables,
 		)
 	except Exception:
 		frappe.log_error(
@@ -141,44 +142,46 @@ def _send_driver_whatsapp(*, issue_name, call_log, caller):
 		)
 
 
-def _resolve_driver_whatsapp_template(call_log):
-	"""Pick the driver-ack template + provider language code by caller language.
+def _resolve_driver_whatsapp_content_sid(call_log):
+	"""Pick the driver-ack Twilio Content SID by the caller's detected language.
 
 	Priority:
 	1. A row in Voice Ops Settings.language_template_map whose `language_code`
 	   matches the Call Log's `custom_detected_language`.
-	2. The single exotel_whatsapp_template_driver_ack setting, paired with
-	   exotel_whatsapp_template_language.
+	2. The single exotel_whatsapp_template_driver_ack setting as a generic
+	   fallback template name.
 
-	Returns (template_name, provider_language_code) or None when no usable
-	template is configured.
+	In both cases the template *name* is looked up in WhatsApp Template
+	Reference to resolve the actual Twilio Content SID. Returns the SID
+	string (HX...) or None when no usable template is configured.
 	"""
 	detected = (call_log.get("custom_detected_language") or "").strip()
 	settings = frappe.get_single("Voice Ops Settings")
 
+	template_name = ""
 	if detected:
 		for row in (settings.get("language_template_map") or []):
 			if (row.language_code or "").strip() == detected:
-				template = (row.whatsapp_template or "").strip()
-				if not template:
-					break
-				lang = (row.template_language_code or "").strip() or detected.split("-")[0]
-				return template, lang
+				template_name = (row.whatsapp_template or "").strip()
+				break
 
-	fallback = (settings.exotel_whatsapp_template_driver_ack or "").strip()
-	if not fallback:
-		return None
-	fallback_lang = (settings.exotel_whatsapp_template_language or "en").strip()
-	return fallback, fallback_lang
+	if not template_name:
+		template_name = (settings.exotel_whatsapp_template_driver_ack or "").strip()
+
+	return _content_sid_from_template_name(template_name)
 
 
 def _send_route_manager_whatsapp(
 	*, issue_name, route_manager, priority, caller, caller_phone, vehicle, url
 ):
-	template = (frappe.db.get_single_value(
+	if not frappe.db.get_single_value("Voice Ops Settings", "enable_exotel_whatsapp_ack"):
+		return
+
+	template_name = (frappe.db.get_single_value(
 		"Voice Ops Settings", "exotel_whatsapp_template_route_manager_alert"
 	) or "").strip()
-	if not template:
+	content_sid = _content_sid_from_template_name(template_name)
+	if not content_sid:
 		return
 
 	to_phone = _normalize_phone((route_manager or {}).get("phone"))
@@ -187,14 +190,41 @@ def _send_route_manager_whatsapp(
 
 	manager_name = (route_manager or {}).get("name") or "Team"
 	caller_display = f"{caller} · {caller_phone}" if caller_phone and caller_phone != "-" else caller
-	params = [manager_name, issue_name, priority, caller_display, vehicle, url]
+	variables = {
+		"1": manager_name,
+		"2": issue_name,
+		"3": priority,
+		"4": caller_display,
+		"5": vehicle,
+		"6": url,
+	}
 	try:
-		send_exotel_whatsapp(to_phone=to_phone, template_name=template, template_params=params)
+		send_twilio_whatsapp_template(
+			to_phone=to_phone,
+			content_sid=content_sid,
+			content_variables=variables,
+		)
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),
 			f"Voice Ops: Route manager WhatsApp alert failed for {issue_name}",
 		)
+
+
+def _content_sid_from_template_name(template_name):
+	"""Look up a Twilio Content SID from a WhatsApp Template Reference doc.
+
+	Returns None when the doctype isn't installed (twilio_integration
+	absent) or the reference doesn't exist.
+	"""
+	if not template_name:
+		return None
+	if not frappe.db.exists("DocType", "WhatsApp Template Reference"):
+		return None
+	sid = frappe.db.get_value(
+		"WhatsApp Template Reference", template_name, "content_sid"
+	)
+	return (sid or "").strip() or None
 
 
 def _normalize_phone(raw):

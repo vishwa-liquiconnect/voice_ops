@@ -467,8 +467,8 @@
 			"fieldname": "twilio_whatsapp_number",
 			"fieldtype": "Data",
 			"label": "Twilio WhatsApp Sender",
-			"depends_on": "eval:doc.enable_whatsapp_notifications",
-			"description": "Twilio WhatsApp-enabled number (e.g. whatsapp:+14155238886)"
+			"depends_on": "eval:doc.enable_whatsapp_notifications || doc.enable_exotel_whatsapp_ack",
+			"description": "Twilio WhatsApp-enabled number (e.g. whatsapp:+14155238886). Used for query notifications and for driver / route-manager acks (via pre-approved Twilio Content Templates)."
 		},
 		{
 			"fieldname": "column_break_notification",

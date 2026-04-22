@@ -113,25 +113,40 @@ def run(call_log_name):
 
 
 def _dispatch_acks(issue_name, call_log):
-	"""Fire the route-manager and driver WhatsApp acks. Best-effort;
-	individual failures are swallowed inside each sender."""
-	employee = call_log.get("caller_employee")
-	route_manager = None
-	if employee:
-		try:
-			from voice_ops.services.caller_lookup import resolve_route_manager
+	"""Send caller ack, then — only when the caller is a driver — loop in
+	the route manager. Best-effort; individual failures are swallowed
+	inside each sender.
 
-			route_manager = resolve_route_manager(employee)
-		except Exception:
-			frappe.log_error(
-				frappe.get_traceback(),
-				f"Voice Ops: route manager lookup failed for {issue_name}",
-			)
-
+	Definition of "driver": the caller's Employee has been assigned as
+	`driver_1` or `driver_2` on at least one Trip Roster Assignment.
+	`resolve_route_manager` enforces this by only returning a RM when
+	such a TRA exists — so a None return value means "not a driver."
+	Office staff, unknown contacts, or one-off Contacts therefore get
+	the WhatsApp ack only; they do not trigger a route-manager alert.
+	"""
 	from voice_ops.services.ack_sender import send_driver_ack, send_route_manager_alert
 
-	send_route_manager_alert(issue_name, call_log, route_manager)
 	send_driver_ack(issue_name, call_log)
+
+	employee = call_log.get("caller_employee")
+	if not employee:
+		return
+
+	try:
+		from voice_ops.services.caller_lookup import resolve_route_manager
+
+		route_manager = resolve_route_manager(employee)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: route manager lookup failed for {issue_name}",
+		)
+		return
+
+	if not route_manager:
+		return
+
+	send_route_manager_alert(issue_name, call_log, route_manager)
 
 
 def _issue_already_created(call_log_name):

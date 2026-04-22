@@ -565,6 +565,86 @@ def send_whatsapp(to_phone, message_body):
 		return None
 
 
+def send_twilio_whatsapp_template(to_phone, content_sid, content_variables=None):
+	"""Send a WhatsApp template message via Twilio Messages API using a Content SID.
+
+	The template must be pre-approved via Twilio Content API + Meta review.
+	Variable substitution happens via `ContentVariables` (a positional dict
+	keyed by "1", "2", ...).
+
+	Args:
+		to_phone: Recipient in E.164 format (e.g. +919876543210).
+		content_sid: Twilio Content SID (HX...).
+		content_variables: Dict of positional variables, e.g.
+			{"1": "Vishwa", "2": "ISS-2026-00001"}.
+
+	Returns:
+		Twilio Message SID on success, None on failure.
+	"""
+	import json as _json
+
+	if not to_phone or not content_sid:
+		return None
+
+	settings = frappe.get_single("Voice Ops Settings")
+	whatsapp_from = (settings.twilio_whatsapp_number or "").strip()
+	if not whatsapp_from:
+		frappe.log_error(
+			"Twilio WhatsApp sender not configured in Voice Ops Settings",
+			"Voice Ops: Twilio WhatsApp Template Send Failed",
+		)
+		return None
+
+	twilio_settings = frappe.get_single("Twilio Settings")
+	account_sid = twilio_settings.account_sid
+	auth_token = twilio_settings.get_password("auth_token")
+	if not (account_sid and auth_token):
+		frappe.log_error(
+			"Twilio Settings missing account_sid / auth_token",
+			"Voice Ops: Twilio WhatsApp Template Send Failed",
+		)
+		return None
+
+	if not whatsapp_from.startswith("whatsapp:"):
+		whatsapp_from = f"whatsapp:{whatsapp_from}"
+	to_whatsapp = to_phone if to_phone.startswith("whatsapp:") else f"whatsapp:{to_phone}"
+
+	payload = {
+		"From": whatsapp_from,
+		"To": to_whatsapp,
+		"ContentSid": content_sid,
+	}
+	if content_variables:
+		payload["ContentVariables"] = _json.dumps({
+			str(k): ("" if v is None else str(v))
+			for k, v in content_variables.items()
+		})
+
+	url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+
+	try:
+		response = requests.post(
+			url,
+			data=payload,
+			auth=(account_sid, auth_token),
+			timeout=30,
+		)
+		response.raise_for_status()
+		return response.json().get("sid")
+	except requests.exceptions.RequestException as e:
+		detail = ""
+		try:
+			if e.response is not None:
+				detail = f"\nResponse: {e.response.status_code} {e.response.text}"
+		except Exception:
+			pass
+		frappe.log_error(
+			title="Voice Ops: Twilio WhatsApp Template Send Failed",
+			message=f"Failed to send to {to_phone} (content_sid={content_sid}): {e}{detail}",
+		)
+		return None
+
+
 def send_exotel_whatsapp(to_phone, template_name, template_params=None, language=None):
 	"""
 	Send a WhatsApp template message via Exotel's v2 Messages API.
