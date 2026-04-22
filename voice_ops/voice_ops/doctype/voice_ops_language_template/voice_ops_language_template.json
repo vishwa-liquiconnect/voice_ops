@@ -1,0 +1,47 @@
+{
+	"doctype": "DocType",
+	"name": "Voice Ops Language Template",
+	"module": "Voice Ops",
+	"engine": "InnoDB",
+	"istable": 1,
+	"description": "Maps a detected caller language to the WhatsApp template to use when acknowledging them.",
+	"field_order": [
+		"language_code",
+		"whatsapp_template",
+		"column_break_vltpl",
+		"template_language_code"
+	],
+	"fields": [
+		{
+			"fieldname": "language_code",
+			"fieldtype": "Select",
+			"label": "Detected Language",
+			"options": "hi-IN\nta-IN\nte-IN\nkn-IN\nen-IN\nmr-IN\nbn-IN\ngu-IN\nml-IN\npa-IN",
+			"reqd": 1,
+			"in_list_view": 1,
+			"description": "Sarvam's BCP-47 code detected on the inbound call (e.g. hi-IN)."
+		},
+		{
+			"fieldname": "whatsapp_template",
+			"fieldtype": "Link",
+			"label": "WhatsApp Template",
+			"options": "WhatsApp Template Reference",
+			"reqd": 1,
+			"in_list_view": 1,
+			"description": "Pre-approved WhatsApp template registered in the respective language."
+		},
+		{
+			"fieldname": "column_break_vltpl",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "template_language_code",
+			"fieldtype": "Data",
+			"label": "Template Language Code",
+			"in_list_view": 1,
+			"description": "Language code the template is registered under in the provider (e.g. hi, ta, en). Leave blank to derive from the detected language (hi-IN -> hi)."
+		}
+	],
+	"permissions": [],
+	"track_changes": 0
+}

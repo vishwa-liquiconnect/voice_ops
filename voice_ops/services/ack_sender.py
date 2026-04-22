@@ -117,11 +117,10 @@ def send_driver_ack(issue_name, call_log):
 
 
 def _send_driver_whatsapp(*, issue_name, call_log, caller):
-	template = (frappe.db.get_single_value(
-		"Voice Ops Settings", "exotel_whatsapp_template_driver_ack"
-	) or "").strip()
-	if not template:
+	template_info = _resolve_driver_whatsapp_template(call_log)
+	if not template_info:
 		return
+	template, language = template_info
 
 	to_phone = _normalize_phone(call_log.get("from"))
 	if not to_phone:
@@ -129,12 +128,48 @@ def _send_driver_whatsapp(*, issue_name, call_log, caller):
 
 	params = [caller or "there", issue_name]
 	try:
-		send_exotel_whatsapp(to_phone=to_phone, template_name=template, template_params=params)
+		send_exotel_whatsapp(
+			to_phone=to_phone,
+			template_name=template,
+			template_params=params,
+			language=language,
+		)
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),
 			f"Voice Ops: Driver WhatsApp ack failed for {issue_name}",
 		)
+
+
+def _resolve_driver_whatsapp_template(call_log):
+	"""Pick the driver-ack template + provider language code by caller language.
+
+	Priority:
+	1. A row in Voice Ops Settings.language_template_map whose `language_code`
+	   matches the Call Log's `custom_detected_language`.
+	2. The single exotel_whatsapp_template_driver_ack setting, paired with
+	   exotel_whatsapp_template_language.
+
+	Returns (template_name, provider_language_code) or None when no usable
+	template is configured.
+	"""
+	detected = (call_log.get("custom_detected_language") or "").strip()
+	settings = frappe.get_single("Voice Ops Settings")
+
+	if detected:
+		for row in (settings.get("language_template_map") or []):
+			if (row.language_code or "").strip() == detected:
+				template = (row.whatsapp_template or "").strip()
+				if not template:
+					break
+				lang = (row.template_language_code or "").strip() or detected.split("-")[0]
+				return template, lang
+
+	fallback = (settings.exotel_whatsapp_template_driver_ack or "").strip()
+	if not fallback:
+		return None
+	fallback_lang = (settings.exotel_whatsapp_template_language or "en").strip()
+	return fallback, fallback_lang
 
 
 def _send_route_manager_whatsapp(

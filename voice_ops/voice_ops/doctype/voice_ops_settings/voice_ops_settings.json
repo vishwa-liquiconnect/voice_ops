@@ -96,7 +96,9 @@
 		"exotel_whatsapp_template_language",
 		"column_break_exotel_whatsapp_ack",
 		"exotel_whatsapp_template_driver_ack",
-		"exotel_whatsapp_template_route_manager_alert"
+		"exotel_whatsapp_template_route_manager_alert",
+		"language_template_map_section",
+		"language_template_map"
 	],
 	"fields": [
 		{
@@ -621,6 +623,20 @@
 			"label": "Route Manager Alert Template Name",
 			"depends_on": "eval:doc.enable_exotel_whatsapp_ack",
 			"description": "Pre-approved Exotel template for route manager alert. Body parameters sent in order: {1} manager name, {2} issue name, {3} priority, {4} caller + phone, {5} vehicle, {6} issue URL."
+		},
+		{
+			"fieldname": "language_template_map_section",
+			"fieldtype": "Section Break",
+			"label": "Driver Ack Templates By Language",
+			"depends_on": "eval:doc.enable_exotel_whatsapp_ack",
+			"description": "Map each detected caller language to the WhatsApp template to use when acknowledging the driver. Sarvam's detected language is matched against these rows; the Driver Ack Template Name above is used as fallback when no row matches."
+		},
+		{
+			"fieldname": "language_template_map",
+			"fieldtype": "Table",
+			"label": "Language Template Map",
+			"options": "Voice Ops Language Template",
+			"depends_on": "eval:doc.enable_exotel_whatsapp_ack"
 		}
 	],
 	"permissions": [
