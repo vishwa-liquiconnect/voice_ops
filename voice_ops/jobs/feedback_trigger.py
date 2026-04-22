@@ -124,9 +124,14 @@ def _feedback_call_exists(tra_name):
 
 def _compute_trip_end_datetime(schedule_name, trip_date):
 	"""Return the absolute trip-end datetime from the Schedule Addition's
-	`schedule_locations` row where point_type = 'End'. Handles multi-day
-	trips via the row's Day offset. Returns None when the End row or its
-	time is missing."""
+	`schedule_locations` child table.
+
+	Strategy: take the last stop in the schedule — highest idx with a
+	non-null time. This works for schedules that use explicit
+	'Start'/'End' markers AND for schedules that use 'Boarding Point'/
+	'Dropping Point' vocab (the common case), where the final dropping
+	point is the trip end. Day field on that row carries the offset for
+	multi-day routes."""
 	if not schedule_name or not trip_date:
 		return None
 
@@ -136,7 +141,7 @@ def _compute_trip_end_datetime(schedule_name, trip_date):
 		WHERE parent = %s
 			AND parenttype = 'Schedule Addition'
 			AND parentfield = 'schedule_locations'
-			AND point_type = 'End'
+			AND time IS NOT NULL
 		ORDER BY idx DESC
 		LIMIT 1
 	""", (schedule_name,), as_dict=True)
