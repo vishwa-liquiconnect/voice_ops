@@ -11,3 +11,4 @@ voice_ops.patches.backfill_call_log_links
 voice_ops.patches.migrate_ack_toggle_fieldnames
 voice_ops.patches.backfill_checklist_run_call_log_doctype
 voice_ops.patches.create_feedback_call_type
+voice_ops.patches.register_driver_ack_whatsapp_templates
