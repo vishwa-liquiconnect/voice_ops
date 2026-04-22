@@ -1,18 +1,29 @@
 """
 Outbound Feedback Call Service
 
-Places an outbound Exotel call to a driver using a static App Builder flow
-(Greeting -> Record -> Hangup). The recording gets tagged `type_of_call
-= "Feedback"` and flows through the same ingestion pipeline as voicemails
-(download -> Sarvam transcribe -> store in Call Log.summary).
+Places an outbound Exotel call to a driver. Two execution paths,
+selected by configuration in Voice Ops Settings:
 
-The App flow itself is built in the Exotel dashboard; this service only
-triggers the call and tags the resulting Call Log.
+1. **App flow** (legacy) — `exotel_feedback_flow_app_id` is set. Exotel
+   runs a static App Builder flow (Greeting -> Record -> Hangup). Found
+   in practice to misbehave on outbound: audio plays on the wrong leg,
+   driver hears silence.
+
+2. **ExoML flow** (preferred) — `exotel_feedback_flow_app_id` is blank.
+   Exotel fetches `voice_ops.api.feedback.feedback_exoml` at call time
+   and plays the returned <Play>/<Record> XML. Matches the working
+   inbound pattern and avoids the connect.json click-to-call leg
+   ambiguity.
+
+Either way, the recording ends up on a Call Log tagged
+`type_of_call = "Feedback"` and flows through the same ingestion
+pipeline as voicemails (download -> Sarvam transcribe -> store in
+Call Log.summary).
 """
 
 import frappe
 
-from voice_ops.services.telephony import _initiate_exotel_call
+from voice_ops.services.telephony import _initiate_exotel_call, build_callback_url
 
 
 def _resolve_driver_phone(employee):
@@ -32,7 +43,7 @@ def _resolve_driver_phone(employee):
 def initiate_feedback_call(to_number=None, employee=None,
                             reference_doctype=None, reference_name=None):
 	"""
-	Trigger an outbound feedback call via Exotel's static App flow.
+	Trigger an outbound feedback call via Exotel.
 
 	Args:
 		to_number: Direct phone number. Takes precedence if given.
@@ -43,19 +54,9 @@ def initiate_feedback_call(to_number=None, employee=None,
 
 	Returns:
 		Call Log name (str).
-
-	Raises:
-		frappe.ValidationError if the feedback App ID is not configured,
-		or if neither to_number nor a resolvable employee phone is given.
 	"""
-	flow_app_id = (
-		frappe.db.get_single_value("Voice Ops Settings", "exotel_feedback_flow_app_id") or ""
-	).strip()
-	if not flow_app_id:
-		frappe.throw(
-			"Feedback Flow App ID not configured. "
-			"Set Voice Ops Settings -> Exotel -> Feedback Flow App ID."
-		)
+	settings = frappe.get_single("Voice Ops Settings")
+	flow_app_id = (settings.exotel_feedback_flow_app_id or "").strip()
 
 	if not to_number and employee:
 		to_number = _resolve_driver_phone(employee)
@@ -69,12 +70,19 @@ def initiate_feedback_call(to_number=None, employee=None,
 	elif employee:
 		custom_field = f"employee={employee}"
 
+	# ExoML path when no App ID is configured. Exotel will fetch this
+	# URL when the call connects and play the returned XML on the
+	# callee's leg.
+	callback_url = None
+	if not flow_app_id:
+		callback_url = build_callback_url("voice_ops.api.feedback.feedback_exoml")
+
 	return _initiate_exotel_call(
 		to_number=to_number,
-		callback_url=None,
+		callback_url=callback_url,
 		reference_doctype=reference_doctype,
 		reference_name=reference_name,
-		flow_app_id=flow_app_id,
+		flow_app_id=flow_app_id or None,
 		type_of_call="Feedback",
 		custom_field=custom_field,
 	)

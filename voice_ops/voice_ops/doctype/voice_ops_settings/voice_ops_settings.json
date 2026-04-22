@@ -19,6 +19,7 @@
 		"exotel_caller_id",
 		"exotel_flow_app_id",
 		"exotel_feedback_flow_app_id",
+		"feedback_prompt_audio_url",
 
 		"tab_call_settings",
 		"trigger_section",
@@ -163,7 +164,13 @@
 			"fieldname": "exotel_feedback_flow_app_id",
 			"fieldtype": "Data",
 			"label": "Feedback Flow App ID",
-			"description": "Exotel App (Flow) ID for outbound feedback calls. Build a static flow in the Exotel App Builder: Greeting -> Record -> Hangup."
+			"description": "Exotel App (Flow) ID for outbound feedback calls. Build a static flow in the Exotel App Builder: Greeting -> Record -> Hangup. Leave blank to use dynamic ExoML (Feedback Prompt Audio URL) instead."
+		},
+		{
+			"fieldname": "feedback_prompt_audio_url",
+			"fieldtype": "Data",
+			"label": "Feedback Prompt Audio URL",
+			"description": "Publicly reachable URL (HTTPS MP3 or WAV) played to the driver on a feedback call when using the ExoML path. Used only when Feedback Flow App ID is blank. Leave blank to fall back to Hindi TTS."
 		},
 		{
 			"fieldname": "tab_call_settings",
