@@ -43,6 +43,14 @@ def run(call_log_name):
 	if not payload:
 		return
 
+	# Outbound feedback calls: driver may have nothing to report, so only
+	# create the Issue when Claude confirms the transcript is actionable.
+	# Inbound voicemails always create an Issue — the use case is a driver
+	# calling in *because* they have a problem, so non-actionable is a
+	# near-zero case and we'd rather over-create than miss one.
+	if call_log.get("type_of_call") == "Feedback" and not payload.get("is_actionable"):
+		return
+
 	subject = (payload.get("subject") or "").strip() or f"Call {call_log_name}"
 	description = (payload.get("description") or "").strip() or summary
 	priority = _resolve_priority(payload.get("priority"))

@@ -113,10 +113,13 @@ def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
 		)
 		return
 
-	if type_of_call == "Feedback":
-		return
-
-	_attach_caller_links(call_log_name)
+	# Voicemail is inbound (`from` is the caller) so resolve caller links.
+	# Feedback is outbound (`from` is our exophone) so skip the lookup —
+	# the Call Log already links to the reference doctype passed at
+	# initiation (e.g. Trip Roster Assignment). The Issue pipeline itself
+	# decides whether to create an Issue via the is_actionable gate.
+	if type_of_call == "Voicemail":
+		_attach_caller_links(call_log_name)
 
 	frappe.enqueue(
 		"voice_ops.jobs.create_call_log_issue.run",
