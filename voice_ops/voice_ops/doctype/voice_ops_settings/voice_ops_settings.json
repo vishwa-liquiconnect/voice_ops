@@ -18,6 +18,7 @@
 		"column_break_exotel",
 		"exotel_caller_id",
 		"exotel_flow_app_id",
+		"exotel_feedback_flow_app_id",
 
 		"tab_call_settings",
 		"trigger_section",
@@ -157,6 +158,12 @@
 			"fieldtype": "Data",
 			"label": "Outbound Flow App ID",
 			"description": "Exotel App (Flow) ID for outbound Passthru (e.g. 1223268). If set, outbound uses App=<id>; otherwise falls back to dynamic Url passthru."
+		},
+		{
+			"fieldname": "exotel_feedback_flow_app_id",
+			"fieldtype": "Data",
+			"label": "Feedback Flow App ID",
+			"description": "Exotel App (Flow) ID for outbound feedback calls. Build a static flow in the Exotel App Builder: Greeting -> Record -> Hangup."
 		},
 		{
 			"fieldname": "tab_call_settings",

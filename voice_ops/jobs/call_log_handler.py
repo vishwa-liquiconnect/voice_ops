@@ -77,18 +77,23 @@ def _download_and_attach_exotel_recording(call_log_name, recording_url):
 
 
 def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
-	"""Transcribe voicemail and store the raw transcript in `summary`.
+	"""Transcribe a Voicemail or Feedback recording and store the raw transcript in `summary`.
 
-	Claude summarization is deferred to the voicemail digest job so it only
-	happens once, at alert time, instead of per call.
+	Voicemail flow also resolves caller links and enqueues issue creation.
+	Feedback flow stops after transcription — the Call Log already has the
+	outbound reference links from initiate_feedback_call, and feedback is
+	not an actionable issue.
+
+	Claude summarization (where applicable) is deferred to downstream jobs
+	so it only runs at alert/digest time, not per call.
 	"""
 	type_of_call = frappe.db.get_value("Call Log", call_log_name, "type_of_call")
-	if type_of_call != "Voicemail":
+	if type_of_call not in ("Voicemail", "Feedback"):
 		return
 
 	from voice_ops.services.sarvam import transcribe_bytes
 
-	file_name = "voicemail.mp3" if ".mp3" in recording_url else "voicemail.wav"
+	file_name = f"{type_of_call.lower()}.mp3" if ".mp3" in recording_url else f"{type_of_call.lower()}.wav"
 	try:
 		result = transcribe_bytes(audio_bytes, file_name=file_name)
 		transcript = (result.get("transcript") or "").strip()
@@ -104,8 +109,11 @@ def _transcribe_voicemail(call_log_name, audio_bytes, recording_url):
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),
-			f"Voice Ops: Voicemail transcription failed for {call_log_name}",
+			f"Voice Ops: {type_of_call} transcription failed for {call_log_name}",
 		)
+		return
+
+	if type_of_call == "Feedback":
 		return
 
 	_attach_caller_links(call_log_name)

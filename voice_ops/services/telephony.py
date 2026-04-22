@@ -107,12 +107,20 @@ def _initiate_twilio_call(to_number, twiml_url, reference_doctype, reference_nam
 	return result.get("log")
 
 
-def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_name):
+def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_name,
+                           flow_app_id=None, type_of_call=None, custom_field=None):
 	"""
-	Initiate call via Exotel API with a dynamic flow URL.
+	Initiate call via Exotel API with a dynamic flow URL or a static App flow.
 
-	Exotel's Calls/connect API supports a 'Url' parameter that points to
-	our ExoML endpoint, similar to Twilio's twiml_url.
+	Args:
+		flow_app_id: Override the outbound Exotel App ID. If None, reads
+			`exotel_flow_app_id` from Voice Ops Settings; if that's empty,
+			falls back to dynamic Url passthru.
+		type_of_call: Telephony Call Type label to tag on the Call Log
+			(e.g. "Feedback"). Used downstream to route recording handling.
+		custom_field: Raw CustomField value forwarded to Exotel (e.g.
+			"checklist_run=CR-001"). Defaults to the checklist_run key when
+			a reference_name is passed, preserving legacy behavior.
 	"""
 	settings = frappe.get_single("Exotel Settings")
 	if not settings.enabled:
@@ -123,11 +131,14 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 		f"@api.exotel.com/v1/Accounts/{settings.account_sid}/Calls/connect.json?details=true"
 	)
 
-	callback_url = force_https(callback_url)
+	callback_url = force_https(callback_url) if callback_url else None
 	exophone = _get_exophone()
 	caller_id = frappe.db.get_single_value("Voice Ops Settings", "exotel_caller_id") or exophone
 	to_number = _normalize_exotel_number(to_number)
-	flow_app_id = (frappe.db.get_single_value("Voice Ops Settings", "exotel_flow_app_id") or "").strip()
+	if flow_app_id is None:
+		flow_app_id = (frappe.db.get_single_value("Voice Ops Settings", "exotel_flow_app_id") or "").strip()
+	else:
+		flow_app_id = (flow_app_id or "").strip()
 
 	payload = {
 		"From": exophone,
@@ -136,13 +147,14 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 		"Record": "true",
 	}
 	if flow_app_id:
-		# App flow: Exotel invokes the Passthru applet configured on the Flow,
-		# which has our ExoML endpoint baked in. CustomField is forwarded as
-		# form data so the handler knows which Checklist Run this is for.
 		payload["App"] = flow_app_id
-		if reference_name:
+		if custom_field:
+			payload["CustomField"] = custom_field
+		elif reference_name:
 			payload["CustomField"] = f"checklist_run={reference_name}"
 	else:
+		if not callback_url:
+			frappe.throw("Exotel call needs either a flow_app_id or a callback_url.")
 		payload["Url"] = callback_url
 
 	response = requests.post(endpoint, data=payload, timeout=30)
@@ -161,7 +173,6 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 	call_data = response.json().get("Call", {})
 	call_sid = call_data.get("Sid")
 
-	# Create Call Log entry (Exotel uses ERPNext's built-in Call Log)
 	from exotel_integration.handler import create_call_log
 
 	call_log = create_call_log(
@@ -175,6 +186,11 @@ def _initiate_exotel_call(to_number, callback_url, reference_doctype, reference_
 			"link_name": reference_name,
 		} if reference_doctype and reference_name else None,
 	)
+
+	if type_of_call and frappe.db.exists("Telephony Call Type", type_of_call):
+		frappe.db.set_value("Call Log", call_log.name, "type_of_call", type_of_call)
+		frappe.db.commit()
+
 	return call_log.name
 
 

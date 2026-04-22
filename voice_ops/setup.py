@@ -14,12 +14,14 @@ def after_install():
 
 
 def ensure_telephony_call_types():
-	"""Create Voicemail call type if it doesn't exist. Safe to run multiple times."""
-	if not frappe.db.exists("Telephony Call Type", "Voicemail"):
-		doc = frappe.get_doc({"doctype": "Telephony Call Type", "call_type": "Voicemail"})
+	"""Create required Telephony Call Types if they don't exist. Safe to re-run."""
+	for call_type in ("Voicemail", "Feedback"):
+		if frappe.db.exists("Telephony Call Type", call_type):
+			continue
+		doc = frappe.get_doc({"doctype": "Telephony Call Type", "call_type": call_type})
 		doc.insert(ignore_permissions=True)
 		doc.submit()
-		frappe.db.commit()
+	frappe.db.commit()
 
 
 def create_default_templates():
