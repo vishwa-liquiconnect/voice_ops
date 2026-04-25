@@ -447,9 +447,6 @@ def evaluate_checklist(checklist_run_name):
 		run.status = "Needs Review"
 		run.review_reason = _build_review_reason(run, confidence_threshold)
 	else:
-		run.status = "Approved"
-		run.reviewed_by = "System"
-		run.reviewed_at = now_datetime()
 		run.review_action = "Approved"
 
 	run.save(ignore_permissions=True)
