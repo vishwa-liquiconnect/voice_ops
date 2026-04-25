@@ -16,6 +16,7 @@
 		"crew_member",
 		"crew_member_name",
 		"mobile_number",
+		"selected_language",
 		"status_section",
 		"status",
 		"overall_result",
@@ -95,6 +96,14 @@
 			"fieldtype": "Data",
 			"label": "Mobile Number",
 			"fetch_from": "crew_member.mobile_number"
+		},
+		{
+			"fieldname": "selected_language",
+			"fieldtype": "Select",
+			"label": "Selected Language",
+			"options": "\nen-IN\nhi-IN\nta-IN\nte-IN\nkn-IN",
+			"description": "Language the driver picked on the IVR menu. Set during the call.",
+			"read_only": 1
 		},
 		{
 			"fieldname": "status_section",

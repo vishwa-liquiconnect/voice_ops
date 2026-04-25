@@ -2,8 +2,9 @@
 Twilio Webhook Handlers for Voice Ops
 
 Per-question IVR flow:
-1. twiml_response - Called when call connects. Greets driver, asks first question.
-2. recording_callback - Called after each answer. Stores recording, asks next question.
+1. twiml_response - Called when call connects. Plays the language selection menu.
+2. language_callback - Maps DTMF digit to language, persists it, asks first question.
+3. recording_callback - Called after each answer. Stores recording, asks next question.
    When all questions are done, says thank you and enqueues processing.
 
 All endpoints are allow_guest=True since Twilio calls them without auth.
@@ -13,13 +14,61 @@ All doc reads use frappe.get_cached_doc or flags.ignore_permissions.
 import frappe
 from werkzeug.wrappers import Response
 
+from voice_ops.services.language import localized_question_text
 from voice_ops.services.telephony import (
 	build_callback_url,
 	build_error_xml,
+	build_gather_xml,
 	build_goodbye_xml,
 	build_greeting_record_xml,
 	build_say_record_xml,
 )
+
+
+# Language options mapped to DTMF digits (mirrors inbound flow)
+_LANG_DIGITS = {
+	"1": "en-IN",
+	"2": "hi-IN",
+	"3": "ta-IN",
+	"4": "te-IN",
+	"5": "kn-IN",
+}
+
+# System phrases per language (greeting fallback, no-input, goodbye fallback).
+# Question text comes from the template + on-the-fly translation; these are
+# the fixed shells around the questions.
+_PROMPTS = {
+	"en-IN": {
+		"intro": "Hello. Your checklist is starting.",
+		"no_input": "No response received.",
+		"no_input_next": "No response. Next question.",
+		"goodbye": "Thank you. Your checklist is complete.",
+	},
+	"hi-IN": {
+		"intro": "Namaste. Aapki checklist shuru hoti hai.",
+		"no_input": "Koi jawab nahi mila.",
+		"no_input_next": "Koi jawab nahi mila. Agla sawaal.",
+		"goodbye": "Dhanyavaad. Aapka checklist poora ho gaya hai.",
+	},
+	"ta-IN": {
+		"intro": "Vanakkam. Ungal checklist thodangukirathu.",
+		"no_input": "Badhil varavillai.",
+		"no_input_next": "Badhil varavillai. Adutha kelvi.",
+		"goodbye": "Nandri. Ungal checklist mudivu adaindhullathu.",
+	},
+	"te-IN": {
+		"intro": "Namaskaaram. Mee checklist modaludutondi.",
+		"no_input": "Samadhanam raledu.",
+		"no_input_next": "Samadhanam raledu. Tarvati prashna.",
+		"goodbye": "Dhanyavaadaalu. Mee checklist poorthayindi.",
+	},
+	"kn-IN": {
+		"intro": "Namaskara. Nimma checklist aarambhavaagide.",
+		"no_input": "Uttara barilla.",
+		"no_input_next": "Uttara barilla. Mundina prashne.",
+		"goodbye": "Dhanyavaadagalu. Nimma checklist poorna aagide.",
+	},
+}
 
 
 def _get_template_and_questions(checklist_run):
@@ -30,17 +79,26 @@ def _get_template_and_questions(checklist_run):
 
 
 def _get_question_text(question, language):
-	"""Get question text in the appropriate language."""
-	if language == "hi-IN" and question.question_text_hi:
-		return question.question_text_hi
-	return question.question_text
+	"""Get question text in the selected language, translating on demand."""
+	return localized_question_text(question, language)
 
 
 def _get_language(checklist_run):
-	"""Get language from the checklist template."""
+	"""Resolve the language to use for this run.
+
+	Prefers the language the driver picked on the IVR menu. Falls back to
+	the template default, then Hindi.
+	"""
+	picked = (getattr(checklist_run, "selected_language", None) or "").strip()
+	if picked:
+		return picked
 	return frappe.db.get_value(
 		"Checklist Template", checklist_run.checklist_template, "language"
 	) or "hi-IN"
+
+
+def _get_prompts(language):
+	return _PROMPTS.get(language, _PROMPTS["hi-IN"])
 
 
 def _get_call_settings():
@@ -55,7 +113,8 @@ def _get_call_settings():
 def twiml_response():
 	"""
 	Called when Twilio connects the call.
-	Greets the driver and asks the first checklist question.
+	Plays the language selection menu; the driver's digit choice is handled
+	by `language_callback`.
 	"""
 	try:
 		checklist_run_name = frappe.form_dict.get("checklist_run")
@@ -72,14 +131,98 @@ def twiml_response():
 		frappe.flags.ignore_permissions = True
 
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
+		_template, questions = _get_template_and_questions(checklist_run)
+
+		if not questions:
+			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad."), mimetype="text/xml")
+
+		action_url = build_callback_url(
+			"voice_ops.api.twilio_webhook.language_callback",
+			checklist_run=checklist_run_name,
+		)
+
+		prompt_lines = [
+			("en-IN", "Welcome. Please select your language."),
+			("hi-IN", "Apni bhasha chunein."),
+			("en-IN", "Press 1 for English."),
+			("hi-IN", "Hindi ke liye 2 dabaiye."),
+			("ta-IN", "Tamil-kku 3 azhuthavum."),
+			("te-IN", "Telugu kosam 4 noppandi."),
+			("kn-IN", "Kannada ge 5 odiri."),
+		]
+
+		twiml = build_gather_xml(
+			prompt_lines=prompt_lines,
+			action_url=action_url,
+			num_digits=1,
+			timeout=10,
+		)
+
+		return Response(twiml, mimetype="text/xml")
+
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: TwiML Response Failed")
+		return Response(build_error_xml(), mimetype="text/xml")
+	finally:
+		frappe.flags.ignore_permissions = False
+
+
+@frappe.whitelist(allow_guest=True)
+def language_callback():
+	"""
+	Called after the driver presses a digit on the language menu.
+	Persists the selected language on the Checklist Run, then plays the
+	greeting and the first question in that language.
+
+	Pre-translates remaining questions in the background so subsequent
+	turns don't pay the Claude latency.
+	"""
+	try:
+		frappe.flags.ignore_permissions = True
+
+		args = frappe.request.args
+		form = frappe.request.form
+
+		checklist_run_name = args.get("checklist_run")
+		digits = (form.get("Digits") or "").strip()
+
+		if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
+			return Response(
+				'<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
+				mimetype="text/xml",
+			)
+
+		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
 		template, questions = _get_template_and_questions(checklist_run)
 
 		if not questions:
 			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad."), mimetype="text/xml")
 
-		language = _get_language(checklist_run)
+		# Map digit → language. If no digit / invalid, fall back to the
+		# template default so the call still proceeds.
+		language = _LANG_DIGITS.get(digits)
+		if not language:
+			language = frappe.db.get_value(
+				"Checklist Template", checklist_run.checklist_template, "language"
+			) or "hi-IN"
+
+		frappe.db.set_value("Checklist Run", checklist_run_name, "selected_language", language)
+		frappe.db.commit()
+
+		# Warm the translation cache for the rest of the questions while
+		# the driver hears Q1. First-question translation is synchronous.
+		if len(questions) > 1:
+			frappe.enqueue(
+				"voice_ops.jobs.pretranslate_questions.run",
+				queue="short",
+				template_name=checklist_run.checklist_template,
+				language=language,
+			)
+
+		prompts = _get_prompts(language)
 		call_settings = _get_call_settings()
 		first_question = _get_question_text(questions[0], language)
+
 		callback_url = build_callback_url(
 			"voice_ops.api.twilio_webhook.recording_callback",
 			checklist_run=checklist_run_name, question_idx=0,
@@ -89,10 +232,7 @@ def twiml_response():
 			checklist_run=checklist_run_name, question_idx=0,
 		)
 
-		greeting = template.intro_text or (
-			"Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN"
-			else "Hello. Your checklist is starting."
-		)
+		greeting = template.intro_text or prompts["intro"]
 		timeout = questions[0].response_timeout or call_settings["default_response_timeout"]
 		max_length = call_settings["max_recording_length"]
 
@@ -104,14 +244,14 @@ def twiml_response():
 			status_callback_url=status_callback_url,
 			timeout=timeout,
 			max_length=max_length,
-			no_input_text="Koi jawab nahi mila." if language == "hi-IN" else "No response received.",
+			no_input_text=prompts["no_input"],
 			redirect_url=callback_url,
 		)
 
 		return Response(twiml, mimetype="text/xml")
 
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Voice Ops: TwiML Response Failed")
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: Language Callback Failed")
 		return Response(build_error_xml(), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
@@ -146,6 +286,7 @@ def recording_callback():
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
 		template, questions = _get_template_and_questions(checklist_run)
 		language = _get_language(checklist_run)
+		prompts = _get_prompts(language)
 
 		# Store recording URL on the current response row
 		if recording_url and question_idx < len(checklist_run.responses):
@@ -180,7 +321,7 @@ def recording_callback():
 				status_callback_url=next_status_url,
 				timeout=timeout,
 				max_length=max_length,
-				no_input_text="Koi jawab nahi mila. Agla sawaal." if language == "hi-IN" else "No response. Next question.",
+				no_input_text=prompts["no_input_next"],
 				redirect_url=next_callback_url,
 			)
 			return Response(twiml, mimetype="text/xml")
@@ -206,7 +347,7 @@ def recording_callback():
 		frappe.db.commit()
 
 		return Response(
-			build_goodbye_xml(language, template.outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai."),
+			build_goodbye_xml(language, template.outro_text or prompts["goodbye"]),
 			mimetype="text/xml",
 		)
 

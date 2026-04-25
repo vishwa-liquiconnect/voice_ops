@@ -47,6 +47,44 @@ def resolve_driver_language(call_log):
 	return "en-IN"
 
 
+def localized_question_text(question, language_code):
+	"""Return a question's prompt text in `language_code`.
+
+	Order of preference:
+	  1. English question text when `language_code` is en-IN.
+	  2. Hand-written `question_text_hi` when language is hi-IN and present.
+	  3. Cached Claude translation of the English text, keyed by
+	     `question_key + language_code`. First call per (key, language)
+	     hits Claude; subsequent calls are free.
+	  4. Falls back to English on any failure (live IVR must not stall).
+	"""
+	english_text = (getattr(question, "question_text", None) or "").strip()
+	if not english_text:
+		return ""
+
+	code = (language_code or "").strip() or "en-IN"
+	if code.startswith("en"):
+		return english_text
+
+	if code == "hi-IN":
+		hindi = (getattr(question, "question_text_hi", None) or "").strip()
+		if hindi:
+			return hindi
+
+	question_key = (getattr(question, "question_key", None) or "").strip()
+	cache_field = f"{code}:{question_key}" if question_key else None
+	cache = frappe.cache()
+	if cache_field:
+		hit = cache.hget("voice_ops:question_translation", cache_field)
+		if hit:
+			return hit if isinstance(hit, str) else hit.decode("utf-8")
+
+	translated = translate_to(english_text, code) or english_text
+	if cache_field and translated and translated != english_text:
+		cache.hset("voice_ops:question_translation", cache_field, translated)
+	return translated
+
+
 def translate_to(text, language_code):
 	"""Translate English `text` to `language_code` via Claude.
 
