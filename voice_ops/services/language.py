@@ -30,6 +30,65 @@ LANGUAGE_NAMES = {
 }
 
 
+CHECKLIST_DTMF_LANGUAGES = {
+	"1": "en-IN",
+	"2": "hi-IN",
+	"3": "ta-IN",
+	"4": "te-IN",
+	"5": "kn-IN",
+}
+
+
+CHECKLIST_SYSTEM_PROMPTS = {
+	"en-IN": {
+		"intro": "Hello. Your checklist is starting.",
+		"no_input": "No response received.",
+		"no_input_next": "No response. Next question.",
+		"goodbye": "Thank you. Your checklist is complete.",
+	},
+	"hi-IN": {
+		"intro": "Namaste. Aapki checklist shuru hoti hai.",
+		"no_input": "Koi jawab nahi mila.",
+		"no_input_next": "Koi jawab nahi mila. Agla sawaal.",
+		"goodbye": "Dhanyavaad. Aapka checklist poora ho gaya hai.",
+	},
+	"ta-IN": {
+		"intro": "Vanakkam. Ungal checklist thodangukirathu.",
+		"no_input": "Badhil varavillai.",
+		"no_input_next": "Badhil varavillai. Adutha kelvi.",
+		"goodbye": "Nandri. Ungal checklist mudivu adaindhullathu.",
+	},
+	"te-IN": {
+		"intro": "Namaskaaram. Mee checklist modaludutondi.",
+		"no_input": "Samadhanam raledu.",
+		"no_input_next": "Samadhanam raledu. Tarvati prashna.",
+		"goodbye": "Dhanyavaadaalu. Mee checklist poorthayindi.",
+	},
+	"kn-IN": {
+		"intro": "Namaskara. Nimma checklist aarambhavaagide.",
+		"no_input": "Uttara barilla.",
+		"no_input_next": "Uttara barilla. Mundina prashne.",
+		"goodbye": "Dhanyavaadagalu. Nimma checklist poorna aagide.",
+	},
+}
+
+
+CHECKLIST_MENU_PROMPT_LINES = [
+	("en-IN", "Welcome. Please select your language."),
+	("hi-IN", "Apni bhasha chunein."),
+	("en-IN", "Press 1 for English."),
+	("hi-IN", "Hindi ke liye 2 dabaiye."),
+	("ta-IN", "Tamil-kku 3 azhuthavum."),
+	("te-IN", "Telugu kosam 4 noppandi."),
+	("kn-IN", "Kannada ge 5 odiri."),
+]
+
+
+def checklist_system_prompts(language_code):
+	"""Return greeting/no-input/goodbye phrases for the IVR shell."""
+	return CHECKLIST_SYSTEM_PROMPTS.get(language_code, CHECKLIST_SYSTEM_PROMPTS["hi-IN"])
+
+
 def resolve_driver_language(call_log):
 	"""Return a BCP-47-ish language code for the driver of this call."""
 	code = (call_log.get("custom_detected_language") or "").strip()

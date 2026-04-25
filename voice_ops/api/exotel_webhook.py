@@ -1,13 +1,17 @@
 """
 Exotel Webhook Handlers for Voice Ops
 
-ExoML-based IVR flow (mirrors twilio_webhook.py logic):
-1. exoml_response - Called when outbound call connects. Greets driver, asks first question.
-2. exotel_recording_callback - Called after each answer. Stores recording, asks next question.
+Outbound checklist flow:
+1. exoml_response - Called when outbound call connects. Plays the language
+   selection menu (DTMF).
+2. exotel_checklist_language_callback - Maps digit to language, persists it
+   on the Checklist Run, plays greeting + first question.
+3. exotel_recording_callback - Called after each answer. Stores recording,
+   asks next question, enqueues processing when done.
 
 Inbound driver query flow:
-3. inbound_exoml - Called when driver calls in. Creates Driver Query, asks for name.
-4. inbound_exotel_recording_callback - Steps through name → bus → query.
+4. inbound_exoml - Called when driver calls in. Creates Driver Query, asks for name.
+5. inbound_exotel_recording_callback - Steps through name → bus → query.
 
 All endpoints are allow_guest=True since Exotel calls them as webhooks.
 Exotel sends form-encoded POST data with keys like CallSid, RecordingUrl, etc.
@@ -17,9 +21,16 @@ import frappe
 from frappe.utils import now_datetime
 from werkzeug.wrappers import Response
 
+from voice_ops.services.language import (
+	CHECKLIST_DTMF_LANGUAGES,
+	CHECKLIST_MENU_PROMPT_LINES,
+	checklist_system_prompts,
+	localized_question_text,
+)
 from voice_ops.services.telephony import (
 	build_callback_url,
 	build_error_xml,
+	build_gather_xml,
 	build_goodbye_xml,
 	build_greeting_record_xml,
 	build_say_record_xml,
@@ -30,6 +41,18 @@ from voice_ops.services.telephony import (
 # Outbound checklist flow (Exotel equivalent of twilio_webhook endpoints)
 # ---------------------------------------------------------------------------
 
+def _resolve_checklist_run_name():
+	"""Pull `checklist_run` from query args or from Exotel's CustomField passthru."""
+	name = frappe.form_dict.get("checklist_run")
+	if name:
+		return name
+	custom_field = frappe.form_dict.get("CustomField") or ""
+	for part in custom_field.split("&"):
+		if part.startswith("checklist_run="):
+			return part.split("=", 1)[1]
+	return None
+
+
 def _get_template_and_questions(checklist_run):
 	template = frappe.get_doc("Checklist Template", checklist_run.checklist_template)
 	questions = sorted(template.questions, key=lambda x: x.sequence or 0)
@@ -37,12 +60,15 @@ def _get_template_and_questions(checklist_run):
 
 
 def _get_question_text(question, language):
-	if language == "hi-IN" and question.question_text_hi:
-		return question.question_text_hi
-	return question.question_text
+	return localized_question_text(question, language)
 
 
 def _get_language(checklist_run):
+	"""Prefer the language the driver picked on the IVR menu; fall back to
+	the template default, then Hindi."""
+	picked = (getattr(checklist_run, "selected_language", None) or "").strip()
+	if picked:
+		return picked
 	return frappe.db.get_value(
 		"Checklist Template", checklist_run.checklist_template, "language"
 	) or "hi-IN"
@@ -59,19 +85,11 @@ def _get_call_settings():
 def exoml_response():
 	"""
 	Called when Exotel connects an outbound call.
-	Returns ExoML with greeting + first question + record.
+	Plays the 5-language DTMF menu; the digit is handled by
+	`exotel_checklist_language_callback`.
 	"""
 	try:
-		checklist_run_name = frappe.form_dict.get("checklist_run")
-
-		# App-flow passthru sends the checklist_run via CustomField (form data),
-		# not as a URL query param.
-		if not checklist_run_name:
-			custom_field = frappe.form_dict.get("CustomField") or ""
-			for part in custom_field.split("&"):
-				if part.startswith("checklist_run="):
-					checklist_run_name = part.split("=", 1)[1]
-					break
+		checklist_run_name = _resolve_checklist_run_name()
 
 		if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
 			return Response(
@@ -85,23 +103,89 @@ def exoml_response():
 		frappe.flags.ignore_permissions = True
 
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
+		_template, questions = _get_template_and_questions(checklist_run)
+
+		if not questions:
+			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad.", provider="Exotel"), mimetype="text/xml")
+
+		action_url = build_callback_url(
+			"voice_ops.api.exotel_webhook.exotel_checklist_language_callback",
+			checklist_run=checklist_run_name,
+		)
+
+		exoml = build_gather_xml(
+			prompt_lines=CHECKLIST_MENU_PROMPT_LINES,
+			action_url=action_url,
+			num_digits=1,
+			timeout=10,
+			provider="Exotel",
+		)
+
+		return Response(exoml, mimetype="text/xml")
+
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: ExoML Response Failed")
+		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
+	finally:
+		frappe.flags.ignore_permissions = False
+
+
+@frappe.whitelist(allow_guest=True)
+def exotel_checklist_language_callback():
+	"""
+	Called after the driver presses a digit on the language menu (Exotel).
+	Persists the selected language on the Checklist Run, then plays the
+	greeting + first question in that language. Pre-translates the rest in
+	the background so subsequent questions don't pay Claude latency live.
+	"""
+	try:
+		frappe.flags.ignore_permissions = True
+
+		args = frappe.request.args
+		form = frappe.request.form
+
+		checklist_run_name = args.get("checklist_run")
+		digits = (form.get("digits") or form.get("Digits") or "").strip()
+
+		if not checklist_run_name or not frappe.db.exists("Checklist Run", checklist_run_name):
+			return Response(
+				'<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
+				mimetype="text/xml",
+			)
+
+		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
 		template, questions = _get_template_and_questions(checklist_run)
 
 		if not questions:
 			return Response(build_goodbye_xml("hi-IN", "Dhanyavaad.", provider="Exotel"), mimetype="text/xml")
 
-		language = _get_language(checklist_run)
+		language = CHECKLIST_DTMF_LANGUAGES.get(digits)
+		if not language:
+			language = frappe.db.get_value(
+				"Checklist Template", checklist_run.checklist_template, "language"
+			) or "hi-IN"
+
+		frappe.db.set_value("Checklist Run", checklist_run_name, "selected_language", language)
+		frappe.db.commit()
+
+		if len(questions) > 1:
+			frappe.enqueue(
+				"voice_ops.jobs.pretranslate_questions.run",
+				queue="short",
+				template_name=checklist_run.checklist_template,
+				language=language,
+			)
+
+		prompts = checklist_system_prompts(language)
 		call_settings = _get_call_settings()
 		first_question = _get_question_text(questions[0], language)
+
 		callback_url = build_callback_url(
 			"voice_ops.api.exotel_webhook.exotel_recording_callback",
 			checklist_run=checklist_run_name, question_idx=0,
 		)
 
-		greeting = template.intro_text or (
-			"Namaste. Aapki checklist shuru hoti hai." if language == "hi-IN"
-			else "Hello. Your checklist is starting."
-		)
+		greeting = template.intro_text or prompts["intro"]
 		timeout = questions[0].response_timeout or call_settings["default_response_timeout"]
 		max_length = call_settings["max_recording_length"]
 
@@ -112,7 +196,7 @@ def exoml_response():
 			record_callback_url=callback_url,
 			timeout=timeout,
 			max_length=max_length,
-			no_input_text="Koi jawab nahi mila." if language == "hi-IN" else "No response received.",
+			no_input_text=prompts["no_input"],
 			redirect_url=callback_url,
 			provider="Exotel",
 		)
@@ -120,7 +204,7 @@ def exoml_response():
 		return Response(exoml, mimetype="text/xml")
 
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Voice Ops: ExoML Response Failed")
+		frappe.log_error(frappe.get_traceback(), "Voice Ops: Exotel Checklist Language Callback Failed")
 		return Response(build_error_xml(provider="Exotel"), mimetype="text/xml")
 	finally:
 		frappe.flags.ignore_permissions = False
@@ -152,6 +236,7 @@ def exotel_recording_callback():
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
 		template, questions = _get_template_and_questions(checklist_run)
 		language = _get_language(checklist_run)
+		prompts = checklist_system_prompts(language)
 
 		# Store recording URL
 		if recording_url and question_idx < len(checklist_run.responses):
@@ -177,7 +262,7 @@ def exotel_recording_callback():
 				record_callback_url=next_callback_url,
 				timeout=timeout,
 				max_length=max_length,
-				no_input_text="Koi jawab nahi mila. Agla sawaal." if language == "hi-IN" else "No response. Next question.",
+				no_input_text=prompts["no_input_next"],
 				redirect_url=next_callback_url,
 				provider="Exotel",
 			)
@@ -202,7 +287,7 @@ def exotel_recording_callback():
 		frappe.db.commit()
 
 		return Response(
-			build_goodbye_xml(language, template.outro_text or "Dhanyavaad. Aapka checklist poora ho gaya hai.", provider="Exotel"),
+			build_goodbye_xml(language, template.outro_text or prompts["goodbye"], provider="Exotel"),
 			mimetype="text/xml",
 		)
 
@@ -216,8 +301,6 @@ def exotel_recording_callback():
 # ---------------------------------------------------------------------------
 # Inbound driver query flow (Exotel)
 # ---------------------------------------------------------------------------
-
-from voice_ops.services.telephony import build_gather_xml
 
 # Language options mapped to DTMF digits
 _LANG_DIGITS = {

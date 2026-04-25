@@ -14,7 +14,12 @@ All doc reads use frappe.get_cached_doc or flags.ignore_permissions.
 import frappe
 from werkzeug.wrappers import Response
 
-from voice_ops.services.language import localized_question_text
+from voice_ops.services.language import (
+	CHECKLIST_DTMF_LANGUAGES,
+	CHECKLIST_MENU_PROMPT_LINES,
+	checklist_system_prompts,
+	localized_question_text,
+)
 from voice_ops.services.telephony import (
 	build_callback_url,
 	build_error_xml,
@@ -23,52 +28,6 @@ from voice_ops.services.telephony import (
 	build_greeting_record_xml,
 	build_say_record_xml,
 )
-
-
-# Language options mapped to DTMF digits (mirrors inbound flow)
-_LANG_DIGITS = {
-	"1": "en-IN",
-	"2": "hi-IN",
-	"3": "ta-IN",
-	"4": "te-IN",
-	"5": "kn-IN",
-}
-
-# System phrases per language (greeting fallback, no-input, goodbye fallback).
-# Question text comes from the template + on-the-fly translation; these are
-# the fixed shells around the questions.
-_PROMPTS = {
-	"en-IN": {
-		"intro": "Hello. Your checklist is starting.",
-		"no_input": "No response received.",
-		"no_input_next": "No response. Next question.",
-		"goodbye": "Thank you. Your checklist is complete.",
-	},
-	"hi-IN": {
-		"intro": "Namaste. Aapki checklist shuru hoti hai.",
-		"no_input": "Koi jawab nahi mila.",
-		"no_input_next": "Koi jawab nahi mila. Agla sawaal.",
-		"goodbye": "Dhanyavaad. Aapka checklist poora ho gaya hai.",
-	},
-	"ta-IN": {
-		"intro": "Vanakkam. Ungal checklist thodangukirathu.",
-		"no_input": "Badhil varavillai.",
-		"no_input_next": "Badhil varavillai. Adutha kelvi.",
-		"goodbye": "Nandri. Ungal checklist mudivu adaindhullathu.",
-	},
-	"te-IN": {
-		"intro": "Namaskaaram. Mee checklist modaludutondi.",
-		"no_input": "Samadhanam raledu.",
-		"no_input_next": "Samadhanam raledu. Tarvati prashna.",
-		"goodbye": "Dhanyavaadaalu. Mee checklist poorthayindi.",
-	},
-	"kn-IN": {
-		"intro": "Namaskara. Nimma checklist aarambhavaagide.",
-		"no_input": "Uttara barilla.",
-		"no_input_next": "Uttara barilla. Mundina prashne.",
-		"goodbye": "Dhanyavaadagalu. Nimma checklist poorna aagide.",
-	},
-}
 
 
 def _get_template_and_questions(checklist_run):
@@ -95,10 +54,6 @@ def _get_language(checklist_run):
 	return frappe.db.get_value(
 		"Checklist Template", checklist_run.checklist_template, "language"
 	) or "hi-IN"
-
-
-def _get_prompts(language):
-	return _PROMPTS.get(language, _PROMPTS["hi-IN"])
 
 
 def _get_call_settings():
@@ -141,18 +96,8 @@ def twiml_response():
 			checklist_run=checklist_run_name,
 		)
 
-		prompt_lines = [
-			("en-IN", "Welcome. Please select your language."),
-			("hi-IN", "Apni bhasha chunein."),
-			("en-IN", "Press 1 for English."),
-			("hi-IN", "Hindi ke liye 2 dabaiye."),
-			("ta-IN", "Tamil-kku 3 azhuthavum."),
-			("te-IN", "Telugu kosam 4 noppandi."),
-			("kn-IN", "Kannada ge 5 odiri."),
-		]
-
 		twiml = build_gather_xml(
-			prompt_lines=prompt_lines,
+			prompt_lines=CHECKLIST_MENU_PROMPT_LINES,
 			action_url=action_url,
 			num_digits=1,
 			timeout=10,
@@ -200,7 +145,7 @@ def language_callback():
 
 		# Map digit → language. If no digit / invalid, fall back to the
 		# template default so the call still proceeds.
-		language = _LANG_DIGITS.get(digits)
+		language = CHECKLIST_DTMF_LANGUAGES.get(digits)
 		if not language:
 			language = frappe.db.get_value(
 				"Checklist Template", checklist_run.checklist_template, "language"
@@ -219,7 +164,7 @@ def language_callback():
 				language=language,
 			)
 
-		prompts = _get_prompts(language)
+		prompts = checklist_system_prompts(language)
 		call_settings = _get_call_settings()
 		first_question = _get_question_text(questions[0], language)
 
@@ -286,7 +231,7 @@ def recording_callback():
 		checklist_run = frappe.get_doc("Checklist Run", checklist_run_name)
 		template, questions = _get_template_and_questions(checklist_run)
 		language = _get_language(checklist_run)
-		prompts = _get_prompts(language)
+		prompts = checklist_system_prompts(language)
 
 		# Store recording URL on the current response row
 		if recording_url and question_idx < len(checklist_run.responses):
