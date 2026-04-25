@@ -31,9 +31,9 @@ LANGUAGE_NAMES = {
 
 
 CHECKLIST_DTMF_LANGUAGES = {
-	"1": "en-IN",
-	"2": "hi-IN",
-	"3": "ta-IN",
+	"1": "ta-IN",
+	"2": "en-IN",
+	"3": "hi-IN",
 	"4": "te-IN",
 	"5": "kn-IN",
 }
@@ -75,9 +75,9 @@ CHECKLIST_SYSTEM_PROMPTS = {
 
 CHECKLIST_MENU_PROMPT_LINES = [
 	("en-IN", "Welcome. Please select your language."),
-	("en-IN", "Press 1 for English."),
-	("hi-IN", "हिंदी के लिए 2 दबाएं।"),
-	("ta-IN", "தமிழுக்கு 3 ஐ அழுத்தவும்."),
+	("ta-IN", "தமிழுக்கு 1 ஐ அழுத்தவும்."),
+	("en-IN", "Press 2 for English."),
+	("hi-IN", "हिंदी के लिए 3 दबाएं।"),
 	("te-IN", "తెలుగు కోసం 4 నొక్కండి."),
 	("kn-IN", "ಕನ್ನಡಕ್ಕಾಗಿ 5 ಒತ್ತಿರಿ."),
 ]
