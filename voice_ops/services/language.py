@@ -74,7 +74,6 @@ CHECKLIST_SYSTEM_PROMPTS = {
 
 
 CHECKLIST_MENU_PROMPT_LINES = [
-	("en-IN", "Welcome. Please select your language."),
 	("ta-IN", "தமிழுக்கு 1 ஐ அழுத்தவும்."),
 	("en-IN", "Press 2 for English."),
 	("hi-IN", "हिंदी के लिए 3 दबाएं।"),
