@@ -47,40 +47,39 @@ CHECKLIST_SYSTEM_PROMPTS = {
 		"goodbye": "Thank you. Your checklist is complete.",
 	},
 	"hi-IN": {
-		"intro": "Namaste. Aapki checklist shuru hoti hai.",
-		"no_input": "Koi jawab nahi mila.",
-		"no_input_next": "Koi jawab nahi mila. Agla sawaal.",
-		"goodbye": "Dhanyavaad. Aapka checklist poora ho gaya hai.",
+		"intro": "नमस्ते। आपकी चेकलिस्ट शुरू हो रही है।",
+		"no_input": "कोई जवाब नहीं मिला।",
+		"no_input_next": "कोई जवाब नहीं मिला। अगला सवाल।",
+		"goodbye": "धन्यवाद। आपकी चेकलिस्ट पूरी हो गई है।",
 	},
 	"ta-IN": {
-		"intro": "Vanakkam. Ungal checklist thodangukirathu.",
-		"no_input": "Badhil varavillai.",
-		"no_input_next": "Badhil varavillai. Adutha kelvi.",
-		"goodbye": "Nandri. Ungal checklist mudivu adaindhullathu.",
+		"intro": "வணக்கம். உங்கள் சரிபார்ப்புப் பட்டியல் தொடங்குகிறது.",
+		"no_input": "பதில் கிடைக்கவில்லை.",
+		"no_input_next": "பதில் கிடைக்கவில்லை. அடுத்த கேள்வி.",
+		"goodbye": "நன்றி. உங்கள் சரிபார்ப்புப் பட்டியல் முடிந்தது.",
 	},
 	"te-IN": {
-		"intro": "Namaskaaram. Mee checklist modaludutondi.",
-		"no_input": "Samadhanam raledu.",
-		"no_input_next": "Samadhanam raledu. Tarvati prashna.",
-		"goodbye": "Dhanyavaadaalu. Mee checklist poorthayindi.",
+		"intro": "నమస్కారం. మీ చెక్‌లిస్ట్ ప్రారంభమవుతుంది.",
+		"no_input": "సమాధానం లేదు.",
+		"no_input_next": "సమాధానం లేదు. తదుపరి ప్రశ్న.",
+		"goodbye": "ధన్యవాదాలు. మీ చెక్‌లిస్ట్ పూర్తయింది.",
 	},
 	"kn-IN": {
-		"intro": "Namaskara. Nimma checklist aarambhavaagide.",
-		"no_input": "Uttara barilla.",
-		"no_input_next": "Uttara barilla. Mundina prashne.",
-		"goodbye": "Dhanyavaadagalu. Nimma checklist poorna aagide.",
+		"intro": "ನಮಸ್ಕಾರ. ನಿಮ್ಮ ಚೆಕ್‌ಲಿಸ್ಟ್ ಪ್ರಾರಂಭವಾಗುತ್ತಿದೆ.",
+		"no_input": "ಉತ್ತರ ಬರಲಿಲ್ಲ.",
+		"no_input_next": "ಉತ್ತರ ಬರಲಿಲ್ಲ. ಮುಂದಿನ ಪ್ರಶ್ನೆ.",
+		"goodbye": "ಧನ್ಯವಾದಗಳು. ನಿಮ್ಮ ಚೆಕ್‌ಲಿಸ್ಟ್ ಪೂರ್ಣಗೊಂಡಿದೆ.",
 	},
 }
 
 
 CHECKLIST_MENU_PROMPT_LINES = [
 	("en-IN", "Welcome. Please select your language."),
-	("hi-IN", "Apni bhasha chunein."),
 	("en-IN", "Press 1 for English."),
-	("hi-IN", "Hindi ke liye 2 dabaiye."),
-	("ta-IN", "Tamil-kku 3 azhuthavum."),
-	("te-IN", "Telugu kosam 4 noppandi."),
-	("kn-IN", "Kannada ge 5 odiri."),
+	("hi-IN", "हिंदी के लिए 2 दबाएं।"),
+	("ta-IN", "தமிழுக்கு 3 ஐ அழுத்தவும்."),
+	("te-IN", "తెలుగు కోసం 4 నొక్కండి."),
+	("kn-IN", "ಕನ್ನಡಕ್ಕಾಗಿ 5 ಒತ್ತಿರಿ."),
 ]
 
 

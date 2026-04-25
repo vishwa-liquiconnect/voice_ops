@@ -231,6 +231,28 @@ def _get_exotel_status_callback_url():
 # XML response builders
 # ---------------------------------------------------------------------------
 
+# Twilio's default Polly voices only cover en-IN and hi-IN for Indian
+# languages. Tamil/Telugu/Kannada/etc. need Google voices, otherwise
+# `<Say language="ta-IN">` plays silence. Use Google for everything to
+# keep prosody consistent across the menu.
+_TWILIO_VOICES = {
+	"en-IN": "Google.en-IN-Standard-A",
+	"hi-IN": "Google.hi-IN-Standard-A",
+	"ta-IN": "Google.ta-IN-Standard-A",
+	"te-IN": "Google.te-IN-Standard-A",
+	"kn-IN": "Google.kn-IN-Standard-A",
+	"ml-IN": "Google.ml-IN-Standard-A",
+	"mr-IN": "Google.mr-IN-Standard-A",
+	"bn-IN": "Google.bn-IN-Standard-A",
+	"gu-IN": "Google.gu-IN-Standard-A",
+	"pa-IN": "Google.pa-IN-Standard-A",
+}
+
+
+def _twilio_voice_for(language):
+	return _TWILIO_VOICES.get(language, "Google.en-IN-Standard-A")
+
+
 def build_gather_xml(prompt_lines, action_url, num_digits=1, timeout=10, provider=None):
 	"""
 	Build provider-specific XML for DTMF digit collection.
@@ -249,7 +271,8 @@ def build_gather_xml(prompt_lines, action_url, num_digits=1, timeout=10, provide
 
 def _build_twiml_gather(prompt_lines, action_url, num_digits, timeout):
 	say_tags = "\n\t\t".join(
-		f'<Say language="{lang}">{text}</Say>' for lang, text in prompt_lines
+		f'<Say voice="{_twilio_voice_for(lang)}" language="{lang}">{text}</Say>'
+		for lang, text in prompt_lines
 	)
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -303,13 +326,14 @@ def _build_twiml_say_record(language, say_text, callback_url, status_callback_ur
 	if status_callback_url:
 		status_cb = f' recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST"'
 
+	voice = _twilio_voice_for(language)
 	no_input_line = ""
 	if no_input_text:
-		no_input_line = f'\n\t<Say language="{language}">{no_input_text}</Say>'
+		no_input_line = f'\n\t<Say voice="{voice}" language="{language}">{no_input_text}</Say>'
 
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-\t<Say language="{language}">{say_text}</Say>
+\t<Say voice="{voice}" language="{language}">{say_text}</Say>
 \t<Record action="{callback_url}"{status_cb} timeout="{timeout}" maxLength="{max_length}" playBeep="false" />{no_input_line}
 \t<Redirect>{redirect_url}</Redirect>
 </Response>"""
@@ -340,9 +364,10 @@ def build_goodbye_xml(language, goodbye_text, provider=None):
 \t<Hangup/>
 </Response>"""
 
+	voice = _twilio_voice_for(language)
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-\t<Say language="{language}">{goodbye_text}</Say>
+\t<Say voice="{voice}" language="{language}">{goodbye_text}</Say>
 \t<Hangup/>
 </Response>"""
 
@@ -372,13 +397,14 @@ def build_greeting_record_xml(language, greeting_text, question_text,
 	if status_callback_url:
 		status_cb = f' recordingStatusCallback="{status_callback_url}" recordingStatusCallbackMethod="POST"'
 
-	no_input_line = f'\n\t<Say language="{language}">{no_input}</Say>' if no_input else ""
+	voice = _twilio_voice_for(language)
+	no_input_line = f'\n\t<Say voice="{voice}" language="{language}">{no_input}</Say>' if no_input else ""
 
 	return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-\t<Say language="{language}">{greeting_text}</Say>
+\t<Say voice="{voice}" language="{language}">{greeting_text}</Say>
 \t<Pause length="1"/>
-\t<Say language="{language}">{question_text}</Say>
+\t<Say voice="{voice}" language="{language}">{question_text}</Say>
 \t<Record action="{record_callback_url}"{status_cb} timeout="{timeout}" maxLength="{max_length}" playBeep="false" />{no_input_line}
 \t<Redirect>{redirect}</Redirect>
 </Response>"""
@@ -389,7 +415,7 @@ def build_error_xml(provider=None):
 	provider = provider or "Twilio"
 	if provider == "Exotel":
 		return '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Something went wrong. Please try again later.</Say><Hangup/></Response>'
-	return '<?xml version="1.0" encoding="UTF-8"?><Response><Say language="hi-IN">Kuch galat ho gaya. Kripya baad mein try karein.</Say><Hangup/></Response>'
+	return '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-IN-Standard-A" language="en-IN">Something went wrong. Please try again later.</Say><Hangup/></Response>'
 
 
 # ---------------------------------------------------------------------------
