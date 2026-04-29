@@ -126,19 +126,28 @@ def run(call_log_name):
 
 
 def _dispatch_acks(issue_name, call_log):
-	"""Send caller ack, then — only when the caller is a driver — loop in
-	the route manager. Best-effort; individual failures are swallowed
-	inside each sender.
+	"""Fan out post-Issue notifications. Three independent senders, each
+	gated by its own toggle in Voice Ops Settings. Best-effort;
+	individual failures are swallowed inside each sender.
 
-	Definition of "driver": the caller's Employee has been assigned as
-	`driver_1` or `driver_2` on at least one Trip Roster Assignment.
-	`resolve_route_manager` enforces this by only returning a RM when
-	such a TRA exists — so a None return value means "not a driver."
-	Office staff, unknown contacts, or one-off Contacts therefore get
-	the WhatsApp ack only; they do not trigger a route-manager alert.
+	1. Issue alert email — fires for every Issue, sent to the addresses
+	   listed in `issue_alert_email` (e.g. management).
+	2. Driver ack — fires for every Issue, sent to the caller.
+	3. Route manager alert — only when the caller is a driver. Definition
+	   of "driver": the caller's Employee has been assigned as `driver_1`
+	   or `driver_2` on at least one Trip Roster Assignment.
+	   `resolve_route_manager` enforces this by only returning a RM when
+	   such a TRA exists — so a None return value means "not a driver."
+	   Office staff, unknown contacts, or one-off Contacts therefore get
+	   the alert email + driver ack only; no route-manager alert.
 	"""
-	from voice_ops.services.ack_sender import send_driver_ack, send_route_manager_alert
+	from voice_ops.services.ack_sender import (
+		send_driver_ack,
+		send_issue_alert_email,
+		send_route_manager_alert,
+	)
 
+	send_issue_alert_email(issue_name, call_log)
 	send_driver_ack(issue_name, call_log)
 
 	employee = call_log.get("caller_employee")

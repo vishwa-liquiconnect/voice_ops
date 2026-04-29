@@ -88,8 +88,10 @@
 		"issue_ack_section",
 		"enable_route_manager_alert",
 		"enable_driver_ack",
+		"enable_issue_email_alert",
 		"column_break_issue_ack",
 		"default_driver_language",
+		"issue_alert_email",
 		"exotel_whatsapp_ack_section",
 		"enable_exotel_whatsapp_ack",
 		"exotel_whatsapp_from",
@@ -568,6 +570,12 @@
 			"description": "Email the caller confirming the issue was logged. Silent when no email is resolvable from Contact / Employee records."
 		},
 		{
+			"fieldname": "enable_issue_email_alert",
+			"fieldtype": "Check",
+			"label": "Email Issue Alert Recipients on Issue",
+			"description": "Email the addresses listed in 'Issue Alert Email Recipients' every time a new Issue is created from a call. Silent when no recipients are configured."
+		},
+		{
 			"fieldname": "column_break_issue_ack",
 			"fieldtype": "Column Break"
 		},
@@ -577,6 +585,14 @@
 			"label": "Default Driver Language",
 			"description": "Fallback BCP-47 code when Sarvam detection is unavailable (e.g. hi-IN, ta-IN, te-IN, kn-IN, en-IN).",
 			"default": "en-IN"
+		},
+		{
+			"fieldname": "issue_alert_email",
+			"fieldtype": "Data",
+			"label": "Issue Alert Email Recipients",
+			"options": "Email",
+			"depends_on": "eval:doc.enable_issue_email_alert",
+			"description": "Comma-separated email addresses that receive an alert every time a new Issue is created from a call (e.g. management, ops head)."
 		},
 		{
 			"fieldname": "exotel_whatsapp_ack_section",

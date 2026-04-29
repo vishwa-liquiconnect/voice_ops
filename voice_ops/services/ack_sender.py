@@ -116,6 +116,59 @@ def send_driver_ack(issue_name, call_log):
 	_send_driver_whatsapp(issue_name=issue_name, call_log=call_log, caller=caller)
 
 
+def send_issue_alert_email(issue_name, call_log):
+	"""Email the configured Issue Alert recipients (e.g. management) every
+	time a new Issue is created from a call. Best-effort; silent when the
+	toggle is off or no recipients are configured."""
+	settings = frappe.get_single("Voice Ops Settings")
+	if not getattr(settings, "enable_issue_email_alert", 0):
+		return
+
+	recipients = _parse_recipients(getattr(settings, "issue_alert_email", ""))
+	if not recipients:
+		return
+
+	priority = frappe.db.get_value("Issue", issue_name, "priority") or "Medium"
+	caller = call_log.get("caller_name") or "Unknown"
+	caller_phone = call_log.get("from") or "-"
+	vehicle = (
+		frappe.db.get_value("Issue", issue_name, "custom_vehicle")
+		or call_log.get("caller_vehicle")
+		or "-"
+	)
+	subject_line = frappe.db.get_value("Issue", issue_name, "subject") or "Voicemail Issue"
+	excerpt = _truncate(call_log.get("summary") or "", 360)
+	url = get_url(f"/app/issue/{issue_name}")
+	company = _company_name()
+
+	subject = f"[{company}] New Issue {issue_name} · {priority}"
+	html = _render_issue_alert_html(
+		company=company,
+		issue_name=issue_name,
+		issue_subject=subject_line,
+		priority=priority,
+		caller=caller,
+		phone=caller_phone,
+		vehicle=vehicle,
+		excerpt=excerpt,
+		url=url,
+	)
+	try:
+		frappe.sendmail(recipients=recipients, subject=subject, message=html)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: Issue alert email failed for {issue_name}",
+		)
+
+
+def _parse_recipients(raw):
+	if not raw:
+		return []
+	parts = [p.strip() for p in str(raw).replace(";", ",").split(",")]
+	return [p for p in parts if p and "@" in p]
+
+
 def _send_driver_whatsapp(*, issue_name, call_log, caller):
 	if not frappe.db.get_single_value("Voice Ops Settings", "enable_exotel_whatsapp_ack"):
 		return
@@ -363,6 +416,67 @@ def _render_route_manager_html(
 
     <div style="padding:14px 28px;background:#f8fafc;color:#94a3b8;font-size:11px;text-align:center;border-top:1px solid #e2e8f0;">
       Automated notification · {company} Voice Ops
+    </div>
+  </div>
+</div>
+"""
+
+
+def _render_issue_alert_html(
+	*, company, issue_name, issue_subject, priority, caller, phone, vehicle,
+	excerpt, url
+):
+	priority_color = {
+		"High": "#b91c1c",
+		"Medium": "#b45309",
+		"Low": "#166534",
+	}.get(priority, "#475569")
+
+	row = (
+		'<tr>'
+		'<td style="padding:10px 0;color:#64748b;font-size:13px;width:110px;vertical-align:top;">{label}</td>'
+		'<td style="padding:10px 0;color:#0f172a;font-size:14px;border-bottom:1px solid #f1f5f9;">{value}</td>'
+		'</tr>'
+	)
+	rows = "".join([
+		row.format(label="Ticket", value=f'<a href="{url}" style="color:#0f172a;text-decoration:none;font-weight:600;border-bottom:1px solid #cbd5e1;">{issue_name}</a>'),
+		row.format(label="Subject", value=issue_subject),
+		row.format(label="Priority", value=f'<span style="color:{priority_color};font-weight:600;">{priority}</span>'),
+		row.format(label="Caller", value=f'{caller} &middot; {phone}'),
+		row.format(label="Vehicle", value=vehicle),
+	])
+
+	excerpt_block = (
+		f'<blockquote style="margin:24px 0 0 0;padding:0 0 0 16px;border-left:2px solid #e2e8f0;'
+		f'color:#475569;font-size:14px;line-height:1.6;white-space:pre-wrap;font-style:italic;">'
+		f'{excerpt or "(no transcript)"}'
+		f'</blockquote>'
+	)
+
+	return f"""
+<div style="background:#ffffff;padding:32px 16px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#0f172a;">
+  <div style="max-width:560px;margin:0 auto;">
+    <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">{company}</div>
+    <h1 style="margin:0 0 24px 0;font-size:20px;font-weight:600;color:#0f172a;letter-spacing:-0.01em;">New issue raised</h1>
+
+    <p style="margin:0 0 24px 0;color:#475569;font-size:14px;line-height:1.6;">
+      An issue was auto-created from an incoming call. Details below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border-top:1px solid #f1f5f9;">
+      {rows}
+    </table>
+
+    {excerpt_block}
+
+    <div style="margin-top:28px;">
+      <a href="{url}" style="color:#2563eb;text-decoration:none;font-size:14px;font-weight:600;">
+        Open ticket &rarr;
+      </a>
+    </div>
+
+    <div style="margin-top:40px;padding-top:16px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px;">
+      Automated notification &middot; {company} Voice Ops
     </div>
   </div>
 </div>
