@@ -137,6 +137,9 @@ def send_issue_alert_email(issue_name, call_log):
 		or "-"
 	)
 	subject_line = frappe.db.get_value("Issue", issue_name, "subject") or "Voicemail Issue"
+	description_html = _strip_call_log_footer(
+		frappe.db.get_value("Issue", issue_name, "description") or ""
+	)
 	url = get_url(f"/app/issue/{issue_name}")
 	company = _company_name()
 
@@ -145,6 +148,7 @@ def send_issue_alert_email(issue_name, call_log):
 		company=company,
 		issue_name=issue_name,
 		issue_subject=subject_line,
+		description_html=description_html,
 		priority=priority,
 		caller=caller,
 		phone=caller_phone,
@@ -165,6 +169,22 @@ def _parse_recipients(raw):
 		return []
 	parts = [p.strip() for p in str(raw).replace(";", ",").split(",")]
 	return [p for p in parts if p and "@" in p]
+
+
+def _strip_call_log_footer(html):
+	"""Remove the auto-appended '<hr><p><em>Auto-created from Call Log
+	<a>...</a></em></p>' tail that create_call_log_issue.py adds to
+	Issue.description, so the email shows only Claude's narrative."""
+	if not html:
+		return ""
+	import re
+	cleaned = re.sub(
+		r"<hr\s*/?>\s*<p>\s*<em>\s*Auto-created from Call Log.*?</em>\s*</p>\s*$",
+		"",
+		html,
+		flags=re.DOTALL | re.IGNORECASE,
+	)
+	return cleaned.strip()
 
 
 def _send_driver_whatsapp(*, issue_name, call_log, caller):
@@ -425,7 +445,8 @@ def _render_route_manager_html(
 
 
 def _render_issue_alert_html(
-	*, company, issue_name, issue_subject, priority, caller, phone, vehicle, url
+	*, company, issue_name, issue_subject, description_html, priority,
+	caller, phone, vehicle, url
 ):
 	priority_color = {
 		"High": "#b91c1c",
@@ -444,6 +465,16 @@ def _render_issue_alert_html(
 		row.format(label="Caller", value=f"{caller} &middot; {phone}"),
 		row.format(label="Vehicle", value=vehicle),
 	])
+
+	description_block = ""
+	if description_html:
+		description_block = f"""
+    <div style="padding:0 28px;">
+      <div style="background:#eff6ff;border-left:4px solid #2563eb;border-radius:4px;padding:16px 20px;margin:20px 0 0 0;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#2563eb;margin-bottom:8px;">Details</div>
+        <div style="color:#1e293b;font-size:14px;line-height:1.6;">{description_html}</div>
+      </div>
+    </div>"""
 
 	return f"""
 <div style="background:#f8fafc;padding:24px 12px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;">
@@ -467,7 +498,7 @@ def _render_issue_alert_html(
         </td>
       </tr>
     </table>
-
+{description_block}
     <div style="padding:20px 28px 12px 28px;">
       <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
         <tbody>
