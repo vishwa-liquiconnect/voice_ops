@@ -591,7 +591,10 @@ def send_whatsapp(to_phone, message_body):
 		return None
 
 
-def send_twilio_whatsapp_template(to_phone, content_sid, content_variables=None):
+def send_twilio_whatsapp_template(
+	to_phone, content_sid, content_variables=None,
+	reference_doctype=None, reference_docname=None,
+):
 	"""Send a WhatsApp template message via Twilio Messages API using a Content SID.
 
 	The template must be pre-approved via Twilio Content API + Meta review.
@@ -603,6 +606,10 @@ def send_twilio_whatsapp_template(to_phone, content_sid, content_variables=None)
 		content_sid: Twilio Content SID (HX...).
 		content_variables: Dict of positional variables, e.g.
 			{"1": "Vishwa", "2": "ISS-2026-00001"}.
+		reference_doctype / reference_docname: Optional source doc
+			(e.g. ("Issue", "ISS-2026-00001")) recorded on the
+			WhatsApp Message audit row so the message is browsable
+			from the originating ticket.
 
 	Returns:
 		Twilio Message SID on success, None on failure.
@@ -635,16 +642,18 @@ def send_twilio_whatsapp_template(to_phone, content_sid, content_variables=None)
 		whatsapp_from = f"whatsapp:{whatsapp_from}"
 	to_whatsapp = to_phone if to_phone.startswith("whatsapp:") else f"whatsapp:{to_phone}"
 
+	content_variables_json = None
 	payload = {
 		"From": whatsapp_from,
 		"To": to_whatsapp,
 		"ContentSid": content_sid,
 	}
 	if content_variables:
-		payload["ContentVariables"] = _json.dumps({
+		content_variables_json = _json.dumps({
 			str(k): ("" if v is None else str(v))
 			for k, v in content_variables.items()
 		})
+		payload["ContentVariables"] = content_variables_json
 
 	url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
 
@@ -656,7 +665,7 @@ def send_twilio_whatsapp_template(to_phone, content_sid, content_variables=None)
 			timeout=30,
 		)
 		response.raise_for_status()
-		return response.json().get("sid")
+		message_sid = response.json().get("sid")
 	except requests.exceptions.RequestException as e:
 		detail = ""
 		try:
@@ -669,6 +678,60 @@ def send_twilio_whatsapp_template(to_phone, content_sid, content_variables=None)
 			message=f"Failed to send to {to_phone} (content_sid={content_sid}): {e}{detail}",
 		)
 		return None
+
+	# Audit row in twilio_integration's WhatsApp Message doctype so sends
+	# from voice_ops show up alongside ones routed through their helper.
+	# Best-effort — a log write failure must not fail the send.
+	try:
+		_log_whatsapp_template_send(
+			sid=message_sid,
+			from_=whatsapp_from,
+			to=to_whatsapp,
+			content_sid=content_sid,
+			content_variables_json=content_variables_json,
+			reference_doctype=reference_doctype,
+			reference_docname=reference_docname,
+		)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: WhatsApp Message audit write failed (sid={message_sid})",
+		)
+
+	return message_sid
+
+
+def _log_whatsapp_template_send(
+	*, sid, from_, to, content_sid, content_variables_json,
+	reference_doctype, reference_docname,
+):
+	"""Insert a WhatsApp Message row mirroring twilio_integration's
+	`store_whatsapp_message` shape. Silently skips when the doctype isn't
+	installed (twilio_integration absent)."""
+	if not frappe.db.exists("DocType", "WhatsApp Message"):
+		return
+
+	doc = frappe.get_doc({
+		"doctype": "WhatsApp Message",
+		"id": sid,
+		"from_": from_,
+		"to": to,
+		"status": "Sent",
+		"sent_received": "Sent",
+		"send_on": frappe.utils.now(),
+		"message": f"Template: {content_sid}",
+		"reference_doctype": reference_doctype,
+		"reference_document_name": reference_docname,
+	})
+	doc.insert(ignore_permissions=True)
+
+	# content_sid / content_variables are not in the base doctype JSON but
+	# may exist as custom fields on this site. Mirror twilio_integration's
+	# `store_whatsapp_message` pattern: assign as attrs; any custom-field
+	# persistence is up to the site.
+	doc.content_sid = content_sid
+	doc.content_variables = content_variables_json
+	frappe.db.commit()
 
 
 def send_exotel_whatsapp(to_phone, template_name, template_params=None, language=None):

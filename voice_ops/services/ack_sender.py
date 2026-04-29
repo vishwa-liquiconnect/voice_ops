@@ -187,6 +187,8 @@ def _send_driver_whatsapp(*, issue_name, call_log, caller):
 			to_phone=to_phone,
 			content_sid=content_sid,
 			content_variables=variables,
+			reference_doctype="Issue",
+			reference_docname=issue_name,
 		)
 	except Exception:
 		frappe.log_error(
@@ -256,6 +258,8 @@ def _send_route_manager_whatsapp(
 			to_phone=to_phone,
 			content_sid=content_sid,
 			content_variables=variables,
+			reference_doctype="Issue",
+			reference_docname=issue_name,
 		)
 	except Exception:
 		frappe.log_error(
