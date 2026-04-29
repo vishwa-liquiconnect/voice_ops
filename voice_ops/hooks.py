@@ -50,5 +50,8 @@ scheduler_events = {
 			"voice_ops.jobs.retry_calls.process_pending_retries",
 			"voice_ops.jobs.voicemail_digest.check_and_send",
 		],
+		"0 3 * * *": [
+			"voice_ops.jobs.recording_retention.purge_old_recordings",
+		],
 	},
 }
