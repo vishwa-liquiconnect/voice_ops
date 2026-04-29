@@ -430,53 +430,66 @@ def _render_issue_alert_html(
 		"High": "#b91c1c",
 		"Medium": "#b45309",
 		"Low": "#166534",
-	}.get(priority, "#475569")
+	}.get(priority, "#0f172a")
+
+	excerpt_html = (excerpt or "(no transcript)").replace("\n", "<br>")
 
 	row = (
 		'<tr>'
-		'<td style="padding:10px 0;color:#64748b;font-size:13px;width:110px;vertical-align:top;">{label}</td>'
-		'<td style="padding:10px 0;color:#0f172a;font-size:14px;border-bottom:1px solid #f1f5f9;">{value}</td>'
+		'<td style="padding:12px 10px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;width:30%;vertical-align:top;">{label}</td>'
+		'<td style="padding:12px 10px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-size:13px;line-height:1.55;vertical-align:top;">{value}</td>'
 		'</tr>'
 	)
-	rows = "".join([
-		row.format(label="Ticket", value=f'<a href="{url}" style="color:#0f172a;text-decoration:none;font-weight:600;border-bottom:1px solid #cbd5e1;">{issue_name}</a>'),
+	rows_html = "".join([
 		row.format(label="Subject", value=issue_subject),
-		row.format(label="Priority", value=f'<span style="color:{priority_color};font-weight:600;">{priority}</span>'),
-		row.format(label="Caller", value=f'{caller} &middot; {phone}'),
+		row.format(label="Caller", value=f"{caller} &middot; {phone}"),
 		row.format(label="Vehicle", value=vehicle),
 	])
 
-	excerpt_block = (
-		f'<blockquote style="margin:24px 0 0 0;padding:0 0 0 16px;border-left:2px solid #e2e8f0;'
-		f'color:#475569;font-size:14px;line-height:1.6;white-space:pre-wrap;font-style:italic;">'
-		f'{excerpt or "(no transcript)"}'
-		f'</blockquote>'
-	)
-
 	return f"""
-<div style="background:#ffffff;padding:32px 16px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#0f172a;">
-  <div style="max-width:560px;margin:0 auto;">
-    <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">{company}</div>
-    <h1 style="margin:0 0 24px 0;font-size:20px;font-weight:600;color:#0f172a;letter-spacing:-0.01em;">New issue raised</h1>
+<div style="background:#f8fafc;padding:24px 12px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
 
-    <p style="margin:0 0 24px 0;color:#475569;font-size:14px;line-height:1.6;">
-      An issue was auto-created from an incoming call. Details below.
-    </p>
-
-    <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border-top:1px solid #f1f5f9;">
-      {rows}
-    </table>
-
-    {excerpt_block}
-
-    <div style="margin-top:28px;">
-      <a href="{url}" style="color:#2563eb;text-decoration:none;font-size:14px;font-weight:600;">
-        Open ticket &rarr;
-      </a>
+    <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#ffffff;padding:26px 30px;">
+      <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">{company} · Voice Ops</div>
+      <div style="font-size:22px;font-weight:600;margin-top:6px;letter-spacing:-0.01em;">New Issue Raised</div>
+      <div style="font-size:13px;opacity:0.9;margin-top:4px;">{issue_name}</div>
     </div>
 
-    <div style="margin-top:40px;padding-top:16px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px;">
-      Automated notification &middot; {company} Voice Ops
+    <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+      <tr>
+        <td style="padding:18px 30px;width:50%;border-right:1px solid #e2e8f0;">
+          <div style="font-size:22px;font-weight:700;color:{priority_color};line-height:1;">{priority}</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-top:6px;">Priority</div>
+        </td>
+        <td style="padding:18px 30px;width:50%;">
+          <div style="font-size:13px;font-weight:600;color:#0f172a;">{issue_name}</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-top:6px;">Ticket</div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="padding:0 28px;">
+      <div style="background:#eff6ff;border-left:4px solid #2563eb;border-radius:4px;padding:16px 20px;margin:20px 0 8px 0;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#2563eb;margin-bottom:8px;">Transcript Excerpt</div>
+        <div style="color:#1e293b;font-size:14px;line-height:1.6;">{excerpt_html}</div>
+      </div>
+    </div>
+
+    <div style="padding:0 28px 12px 28px;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+        <tbody>
+          {rows_html}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="padding:8px 28px 24px 28px;text-align:center;">
+      <a href="{url}" style="display:inline-block;padding:10px 22px;background:#2563eb;color:#ffffff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Open ticket &rarr;</a>
+    </div>
+
+    <div style="padding:16px 30px;background:#f8fafc;color:#94a3b8;font-size:11px;text-align:center;border-top:1px solid #e2e8f0;">
+      Automated alert · {company} Voice Ops
     </div>
   </div>
 </div>
