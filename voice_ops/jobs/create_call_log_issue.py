@@ -147,8 +147,21 @@ def _dispatch_acks(issue_name, call_log):
 		send_route_manager_alert,
 	)
 
-	send_issue_alert_email(issue_name, call_log)
-	send_driver_ack(issue_name, call_log)
+	# Senders are independent — wrap each so one failure can't suppress
+	# the others. Without this, a regression in send_issue_alert_email
+	# (or any caller-resolved field it touches) would silently kill the
+	# driver ack and route-manager alert downstream.
+	for sender, label in (
+		(send_issue_alert_email, "issue alert email"),
+		(send_driver_ack, "driver ack"),
+	):
+		try:
+			sender(issue_name, call_log)
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Voice Ops: {label} dispatch failed for {issue_name}",
+			)
 
 	employee = call_log.get("caller_employee")
 	if not employee:
@@ -168,7 +181,13 @@ def _dispatch_acks(issue_name, call_log):
 	if not route_manager:
 		return
 
-	send_route_manager_alert(issue_name, call_log, route_manager)
+	try:
+		send_route_manager_alert(issue_name, call_log, route_manager)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Voice Ops: route manager alert dispatch failed for {issue_name}",
+		)
 
 
 def _issue_already_created(call_log_name):
