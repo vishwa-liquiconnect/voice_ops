@@ -137,7 +137,6 @@ def send_issue_alert_email(issue_name, call_log):
 		or "-"
 	)
 	subject_line = frappe.db.get_value("Issue", issue_name, "subject") or "Voicemail Issue"
-	excerpt = _truncate(call_log.get("summary") or "", 360)
 	url = get_url(f"/app/issue/{issue_name}")
 	company = _company_name()
 
@@ -150,7 +149,6 @@ def send_issue_alert_email(issue_name, call_log):
 		caller=caller,
 		phone=caller_phone,
 		vehicle=vehicle,
-		excerpt=excerpt,
 		url=url,
 	)
 	try:
@@ -427,16 +425,13 @@ def _render_route_manager_html(
 
 
 def _render_issue_alert_html(
-	*, company, issue_name, issue_subject, priority, caller, phone, vehicle,
-	excerpt, url
+	*, company, issue_name, issue_subject, priority, caller, phone, vehicle, url
 ):
 	priority_color = {
 		"High": "#b91c1c",
 		"Medium": "#b45309",
 		"Low": "#166534",
 	}.get(priority, "#0f172a")
-
-	excerpt_html = (excerpt or "(no transcript)").replace("\n", "<br>")
 
 	row = (
 		'<tr>'
@@ -473,14 +468,7 @@ def _render_issue_alert_html(
       </tr>
     </table>
 
-    <div style="padding:0 28px;">
-      <div style="background:#eff6ff;border-left:4px solid #2563eb;border-radius:4px;padding:16px 20px;margin:20px 0 8px 0;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#2563eb;margin-bottom:8px;">Transcript Excerpt</div>
-        <div style="color:#1e293b;font-size:14px;line-height:1.6;">{excerpt_html}</div>
-      </div>
-    </div>
-
-    <div style="padding:0 28px 12px 28px;">
+    <div style="padding:20px 28px 12px 28px;">
       <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
         <tbody>
           {rows_html}
