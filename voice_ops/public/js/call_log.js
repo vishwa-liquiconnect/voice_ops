@@ -1,3 +1,20 @@
+// Call Log form script.
+//
+// Two responsibilities on the desk form:
+//
+// 1. Replace ERPNext's native <audio> player with one that streams via
+//    `voice_ops.api.call_log.stream_recording`. The native player hits
+//    the Twilio/Exotel URL directly, which triggers an HTTP Basic Auth
+//    prompt in the browser — the proxy reads the recording server-side
+//    using stored credentials and re-serves the bytes without auth.
+//    The `setTimeout(50)` waits for ERPNext's own recording setup to
+//    finish before we overwrite it; without that, the native player
+//    can race us and start the auth-prompted load anyway.
+//
+// 2. Add a "Transcribe Recording" button so ops can manually re-run
+//    Sarvam on a recording that didn't transcribe (silent voicemail,
+//    failed job, etc.). The returned transcript is written into the
+//    `summary` field and the doc is saved.
 frappe.ui.form.on("Call Log", {
 	refresh(frm) {
 		if (frm.doc.recording_url) {

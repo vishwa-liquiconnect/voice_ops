@@ -1,3 +1,30 @@
+"""
+Frappe app manifest for voice_ops.
+
+Every key in this file is read by Frappe at install / boot time:
+
+- `app_name`, `app_title`, etc. — registration metadata.
+- `required_apps` — Frappe refuses to install voice_ops without these.
+- `after_install` — runs `voice_ops.setup.after_install` once on install
+  to seed default Checklist Templates and required Telephony Call Types.
+- `app_include_js` — injected on every desk page; here it loads the
+  global proxy that rewrites raw Exotel <audio src> tags so the browser
+  doesn't get hit with HTTP Basic Auth prompts when ERPNext's call_link
+  timeline template renders a recording.
+- `doctype_js` — per-doctype form scripts (only Call Log here; other
+  doctypes ship their script alongside their JSON in voice_ops/doctype/).
+- `doc_events` — document hooks. Twilio Call Log and Call Log both fan
+  out to call_log_handler so we capture the recording and trigger
+  downstream processing regardless of which provider ingested the call.
+- `scheduler_events` — cron schedule. The every-5-minute list drives
+  every auto-trigger / retry / digest job; the daily 3 a.m. entry purges
+  old recording files (`recording_retention`).
+
+Touch this file when adding a new doctype with form scripts, a new cron,
+or a new document hook. Implementation lives in the modules referenced
+by dotted path below.
+"""
+
 app_name = "voice_ops"
 app_title = "Voice Ops"
 app_publisher = "Liqui-Connect"

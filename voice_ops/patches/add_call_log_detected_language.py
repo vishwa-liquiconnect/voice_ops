@@ -1,3 +1,12 @@
+"""
+Patch: add the `custom_detected_language` custom field to Call Log.
+
+Populated by Sarvam's `language_code` at voicemail-transcription time
+and consumed by `services.language.resolve_driver_language` to pick the
+WhatsApp ack language. Read-only on the form; `create_custom_fields`
+is idempotent, so re-running is safe.
+"""
+
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 

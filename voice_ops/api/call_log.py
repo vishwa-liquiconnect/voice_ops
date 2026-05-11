@@ -1,3 +1,18 @@
+"""
+Call Log API.
+
+Two whitelisted endpoints used from the desk:
+
+- `stream_recording` — proxies a Twilio/Exotel recording through Frappe
+  so the browser never sees the upstream HTTP Basic Auth prompt. Used
+  by `public/js/timeline_recording_proxy.js` and the Call Log form's
+  rewritten <audio> player.
+- `transcribe_recording` — manual re-trigger from the Call Log form to
+  re-run Sarvam on the attached recording (e.g. when the original
+  voicemail-ingest job failed). Returns the transcript; the caller
+  writes it into `summary`.
+"""
+
 from urllib.parse import urlparse
 
 import frappe

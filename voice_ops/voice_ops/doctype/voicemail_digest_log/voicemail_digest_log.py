@@ -1,3 +1,28 @@
+"""
+Voicemail Digest Log DocType controller.
+
+One row per digest window. Owns:
+
+- the window bounds (`window_start`, `window_end`)
+- the channel toggle (Email / WhatsApp / Both)
+- comma-separated recipient lists for each channel
+- the rendered HTML body + plain subject line
+- a child table of Voicemail Digest Entry rows (one per voicemail)
+- the AI-written `overall_summary`
+- status (Draft → Generated → Sent / Failed)
+
+Two whitelisted methods drive the desk UI:
+- `generate()` — scans Call Logs in the window, enriches each voicemail
+  with caller info, summarizes the batch via Claude, and renders the
+  HTML body. Safe to re-run.
+- `send_now()` — ships the rendered body to email and/or WhatsApp
+  recipients. Re-runs `generate()` first if still in Draft.
+
+The same code path is reused by the scheduler entry in
+`jobs/voicemail_digest.py`, which creates a digest log per window and
+calls `generate` + `send_now` on it.
+"""
+
 import frappe
 from frappe.model.document import Document
 from frappe.utils import format_datetime, get_datetime, get_url, now_datetime

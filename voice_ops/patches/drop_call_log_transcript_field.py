@@ -1,3 +1,11 @@
+"""
+Patch: drop the legacy `transcript` custom field from Call Log.
+
+Raw transcripts are now written to the core `summary` field at capture
+time and rewritten with the Claude summary at digest time; the custom
+field was redundant. Safe to re-run via `ignore_missing=True`.
+"""
+
 import frappe
 
 
